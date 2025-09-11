@@ -1,0 +1,1 @@
+/home/duarte/.local/share/caelestia/fish
