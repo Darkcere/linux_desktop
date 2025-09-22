@@ -245,17 +245,7 @@ class AppLauncher(Box):
         return True
 
     def resize_viewport(self):
-        """Calculates the max width of the children and sets the min_content_width."""
-        max_width = 0
-        # Iterate through the children to find the widest one
-        for child in self.viewport.get_children():
-            # Get the preferred width of the child
-            width = child.get_preferred_width()[0]
-            if width > max_width:
-                max_width = width
-        if max_width > 0:
-            self.scrolled_window.set_min_content_width(max_width)
-        return False
+        pass
 
     def bake_application_slot(self, app: DesktopApp, **kwargs) -> Button:
         button = Button(
