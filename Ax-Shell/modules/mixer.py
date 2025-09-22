@@ -124,10 +124,15 @@ class MixerSection(Box):
                 h_expand=True,
                 v_expand=False,  # Prevent vertical stretching
             )
-
+            if label_text != stream.description:
+                # If they are different, display both
+                formatted_label = f"[{math.ceil(stream.volume)}%] {stream.description} - {label_text}"
+            else:
+                # If they are the same, just display the label text
+                formatted_label = f"[{math.ceil(stream.volume)}%] {stream.description}"
             label = Label(
                 name="mixer-stream-label",
-                label=f"[{math.ceil(stream.volume)}%] {stream.description}",
+                label=formatted_label,
                 h_expand=True,
                 h_align="start",
                 v_align="center",
