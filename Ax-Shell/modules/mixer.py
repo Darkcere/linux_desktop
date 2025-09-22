@@ -6,7 +6,7 @@ from fabric.widgets.box import Box
 from fabric.widgets.label import Label
 from fabric.widgets.scale import Scale
 from fabric.widgets.scrolledwindow import ScrolledWindow
-
+from gi.repository import GLib
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
@@ -37,6 +37,7 @@ class MixerSlider(Scale):
             style_classes=["no-icon"],
             **kwargs,
         )
+
         self.stream = stream
         self._updating_from_stream = False
         self.set_value(stream.volume / 100)
@@ -45,14 +46,17 @@ class MixerSlider(Scale):
         self.connect("value-changed", self.on_value_changed)
         stream.connect("changed", self.on_stream_changed)
 
+        # Apply appropriate style class based on stream type
         if hasattr(stream, "type"):
             if "microphone" in stream.type.lower() or "input" in stream.type.lower():
                 self.add_style_class("mic")
             else:
                 self.add_style_class("vol")
         else:
+            # Default to volume style
             self.add_style_class("vol")
 
+        # Set initial tooltip and muted state
         self.set_tooltip_text(f"{stream.volume:.0f}%")
         self.update_muted_state()
 
@@ -82,7 +86,7 @@ class MixerSection(Box):
         super().__init__(
             name="mixer-section",
             orientation="v",
-            spacing=4,  # Consistent spacing
+            spacing=8,
             h_expand=True,
             v_expand=False,  # Prevent vertical stretching
         )
@@ -97,7 +101,7 @@ class MixerSection(Box):
         self.content_box = Box(
             name="mixer-content",
             orientation="v",
-            spacing=4,
+            spacing=8,
             h_expand=True,
             v_expand=False,  # Prevent vertical stretching
         )
@@ -116,14 +120,14 @@ class MixerSection(Box):
 
             stream_container = Box(
                 orientation="v",
-                spacing=0,  # No extra spacing inside container
+                spacing=4,
                 h_expand=True,
                 v_expand=False,  # Prevent vertical stretching
             )
 
             label = Label(
                 name="mixer-stream-label",
-                label=f"[{math.ceil(stream.volume)}%] {label_text}",
+                label=f"[{math.ceil(stream.volume)}%] {stream.description}",
                 h_expand=True,
                 h_align="start",
                 v_align="center",
