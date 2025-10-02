@@ -5,6 +5,7 @@ from fabric.widgets.stack import Stack
 import time
 
 import config.data as data
+
 gi.require_version("Gtk", "3.0")
 from gi.repository import GLib, Gtk
 
@@ -12,6 +13,7 @@ import modules.icons as icons
 from modules.mixer import Mixer
 from modules.wallpapers import WallpaperSelector
 from modules.widgets import Widgets
+
 
 class Dashboard(Box):
     def __init__(self, **kwargs):
@@ -63,7 +65,8 @@ class Dashboard(Box):
 
         # Setup icons only if needed
         if data.PANEL_THEME == "Panel" and (
-            data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]
+            data.BAR_POSITION in ["Left", "Right"]
+            or data.PANEL_POSITION in ["Start", "End"]
         ):
             GLib.idle_add(self._setup_switcher_icons)
             print(f"[{time.strftime('%H:%M:%S')}] Scheduled switcher icons setup")
@@ -85,21 +88,30 @@ class Dashboard(Box):
         for btn in buttons:
             if isinstance(btn, Gtk.ToggleButton):
                 for child in btn.get_children():
-                    if isinstance(child, Gtk.Label) and not child.get_name().startswith("switcher-icon"):
+                    if isinstance(child, Gtk.Label) and not child.get_name().startswith(
+                        "switcher-icon"
+                    ):
                         label_text = child.get_text()
                         if label_text in icon_details_map:
                             details = icon_details_map[label_text]
                             btn.remove(child)
-                            new_icon_label = Label(name=f"switcher-icon-{details['name']}", markup=details["icon"])
+                            new_icon_label = Label(
+                                name=f"switcher-icon-{details['name']}",
+                                markup=details["icon"],
+                            )
                             btn.add(new_icon_label)
                             new_icon_label.show()
-                            print(f"[{time.strftime('%H:%M:%S')}] Replaced label with icon for {label_text}")
+                            print(
+                                f"[{time.strftime('%H:%M:%S')}] Replaced label with icon for {label_text}"
+                            )
                             break
         self.switcher.thaw_notify()
         return GLib.SOURCE_REMOVE
 
     def on_visible_child_changed(self, stack, param):
-        print(f"[{time.strftime('%H:%M:%S')}] Dashboard visible child changed to {stack.get_visible_child_name()}")
+        print(
+            f"[{time.strftime('%H:%M:%S')}] Dashboard visible child changed to {stack.get_visible_child_name()}"
+        )
         visible = stack.get_visible_child()
         if visible == self.wallpapers and self.wallpapers.search_entry.get_text():
             self.wallpapers.search_entry.set_text("")
@@ -122,6 +134,8 @@ class Dashboard(Box):
         self.stack.set_visible_child(children[prev_index])
 
     def go_to_section(self, section_name):
-        print(f"[{time.strftime('%H:%M:%S')}] Going to dashboard section: {section_name}")
+        print(
+            f"[{time.strftime('%H:%M:%S')}] Going to dashboard section: {section_name}"
+        )
         if section_name in ["widgets", "wallpapers", "mixer"]:
             self.stack.set_visible_child_name(section_name)

@@ -25,6 +25,7 @@ from utils.icon_resolver import IconResolver
 from utils.occlusion import check_occlusion
 from widgets.wayland import WaylandWindow as Window
 
+
 class Notch(Window):
     def __init__(self, **kwargs):
         is_panel_vertical = False
@@ -240,7 +241,6 @@ class Notch(Window):
         else:
             self.compact_stack.set_visible_child(self.active_window_box)
 
-
         self.compact = Gtk.EventBox(name="notch-compact")
         self.compact.set_visible(True)
         self.compact.add(self.compact_stack)
@@ -411,7 +411,9 @@ class Notch(Window):
 
         if data.PANEL_THEME == "Notch" and data.BAR_POSITION != "Top":
             GLib.timeout_add(2000, self._check_occlusion)  # Throttled to 2000ms
-            print(f"[{time.strftime('%H:%M:%S')}] Started occlusion check timer (2000ms)")
+            print(
+                f"[{time.strftime('%H:%M:%S')}] Started occlusion check timer (2000ms)"
+            )
         elif data.PANEL_THEME == "Notch":
             self.notch_revealer.set_reveal_child(True)
         else:
@@ -602,7 +604,9 @@ class Notch(Window):
         self._is_notch_open = True
 
     def toggle_hidden(self):
-        print(f"[{time.strftime('%H:%M:%S')}] Toggling notch visibility: {'hidden' if self.hidden else 'visible'}")
+        print(
+            f"[{time.strftime('%H:%M:%S')}] Toggling notch visibility: {'hidden' if self.hidden else 'visible'}"
+        )
         self.hidden = not self.hidden
         self.set_visible(not self.hidden)
 
@@ -628,7 +632,7 @@ class Notch(Window):
             return False
         self.compact_stack.set_visible_child(children[new_index])
         self._scrolling = True
-        GLib.timeout_add(250, self._reset_scrolling)
+        GLib.timeout_add(500, self._reset_scrolling)
         return True
 
     def _reset_scrolling(self):
@@ -637,7 +641,6 @@ class Notch(Window):
 
     def on_player_vanished(self, *args):
         print(f"[{time.strftime('%H:%M:%S')}] MPRIS player vanished")
-
 
     def restore_label_properties(self):
         print(f"[{time.strftime('%H:%M:%S')}] Restoring active window label properties")
@@ -674,7 +677,9 @@ class Notch(Window):
     def update_window_icon(self, *args):
         current_time = time.time()
         if current_time - self._last_window_icon_update < 0.05:  # Debounce to 2s
-            print(f"[{time.strftime('%H:%M:%S')}] Skipping window icon update (debounced)")
+            print(
+                f"[{time.strftime('%H:%M:%S')}] Skipping window icon update (debounced)"
+            )
             return
         self._last_window_icon_update = current_time
         print(f"[{time.strftime('%H:%M:%S')}] Updating window icon")
@@ -757,6 +762,7 @@ class Notch(Window):
         print(f"[{time.strftime('%H:%M:%S')}] Getting current window class")
         try:
             from fabric.hyprland.widgets import get_hyprland_connection
+
             conn = get_hyprland_connection()
             if conn:
                 active_window_json = conn.send_command("j/activewindow").reply.decode()

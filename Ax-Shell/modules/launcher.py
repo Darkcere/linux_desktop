@@ -7,8 +7,13 @@ import subprocess
 from collections.abc import Iterator
 
 import numpy as np
-from fabric.utils import (DesktopApp, exec_shell_command_async,
-                          get_desktop_applications, idle_add, remove_handler)
+from fabric.utils import (
+    DesktopApp,
+    exec_shell_command_async,
+    get_desktop_applications,
+    idle_add,
+    remove_handler,
+)
 from fabric.utils.helpers import get_relative_path
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
@@ -25,6 +30,7 @@ from utils.conversion import Conversion
 
 tooltip_settings = f"<b>Open {data.APP_NAME_CAP} Settings</b>"
 tooltip_close = "<b>Close</b>"
+
 
 class AppLauncher(Box):
     def __init__(self, **kwargs):
@@ -68,7 +74,9 @@ class AppLauncher(Box):
             h_expand=True,
             h_align="fill",
             notify_text=self.notify_text,
-            on_activate=lambda entry, *_: self.on_search_entry_activate(entry.get_text()),
+            on_activate=lambda entry, *_: self.on_search_entry_activate(
+                entry.get_text()
+            ),
             on_key_press_event=self.on_search_entry_key_press,
         )
         self.search_entry.props.xalign = 0.5
@@ -93,7 +101,12 @@ class AppLauncher(Box):
                     name="config-button",
                     tooltip_markup=tooltip_settings,
                     child=Label(name="config-label", markup=icons.config),
-                    on_clicked=lambda *_: (exec_shell_command_async(f"python {get_relative_path('../config/config.py')}"), self.close_launcher()),
+                    on_clicked=lambda *_: (
+                        exec_shell_command_async(
+                            f"python {get_relative_path('../config/config.py')}"
+                        ),
+                        self.close_launcher(),
+                    ),
                 ),
                 self.search_entry,
                 Button(
@@ -101,7 +114,7 @@ class AppLauncher(Box):
                     tooltip_markup=tooltip_close,
                     child=Label(name="close-label", markup=icons.cancel),
                     tooltip_text="Exit",
-                    on_clicked=lambda *_: self.close_launcher()
+                    on_clicked=lambda *_: self.close_launcher(),
                 ),
             ],
         )
@@ -144,6 +157,7 @@ class AppLauncher(Box):
         self.save_app_usage()
         self.arrange_viewport()
         print("Application usage history has been reset.")
+
     # End of new code
 
     def close_launcher(self):
@@ -167,7 +181,7 @@ class AppLauncher(Box):
 
     def ensure_initialized(self):
         """Make sure the launcher is initialized with apps list before opening"""
-        if not hasattr(self, '_initialized'):
+        if not hasattr(self, "_initialized"):
             self._all_apps = get_desktop_applications()
             self._initialized = True
             return True
@@ -184,6 +198,7 @@ class AppLauncher(Box):
         remove_handler(self._arranger_handler) if self._arranger_handler else None
         self.viewport.children = []
         self.selected_index = -1
+
         def extract_command_name(command_line):
             """Extract base command name from command line, removing paths and arguments"""
             if not command_line:
@@ -216,8 +231,11 @@ class AppLauncher(Box):
         # Start of new code for sorting
         sorted_apps = sorted(
             filtered_apps,
-            key=lambda app: (self.app_usage.get(app.display_name or app.name, 0), (app.display_name or "").casefold()),
-            reverse=True
+            key=lambda app: (
+                self.app_usage.get(app.display_name or app.name, 0),
+                (app.display_name or "").casefold(),
+            ),
+            reverse=True,
         )
         # End of new code
 
@@ -226,7 +244,8 @@ class AppLauncher(Box):
         should_resize = operator.length_hint(filtered_apps_iter) == len(self._all_apps)
 
         self._arranger_handler = idle_add(
-            lambda apps_iter: self.add_next_application(apps_iter) or self.handle_arrange_complete(should_resize, query),
+            lambda apps_iter: self.add_next_application(apps_iter)
+            or self.handle_arrange_complete(should_resize, query),
             filtered_apps_iter,
             pin=True,
         )
@@ -255,7 +274,11 @@ class AppLauncher(Box):
                 orientation="h",
                 spacing=10,
                 children=[
-                    Image(name="app-icon", pixbuf=app.get_icon_pixbuf(size=24), h_align="start"),
+                    Image(
+                        name="app-icon",
+                        pixbuf=app.get_icon_pixbuf(size=24),
+                        h_align="start",
+                    ),
                     Label(
                         name="app-label",
                         label=app.display_name or "Unknown",
@@ -280,7 +303,9 @@ class AppLauncher(Box):
         return button
 
     def update_selection(self, new_index: int):
-        if self.selected_index != -1 and self.selected_index < len(self.viewport.get_children()):
+        if self.selected_index != -1 and self.selected_index < len(
+            self.viewport.get_children()
+        ):
             current_button = self.viewport.get_children()[self.selected_index]
             current_button.get_style_context().remove_class("selected")
 
@@ -310,6 +335,7 @@ class AppLauncher(Box):
                 new_value = y + height - page_size
                 adj.set_value(new_value)
             return False
+
         GLib.idle_add(scroll)
 
     def on_search_entry_activate(self, text):
@@ -337,19 +363,32 @@ class AppLauncher(Box):
                 if children:
                     if text.strip() == "" and self.selected_index == -1:
                         return
-                    selected_index = self.selected_index if self.selected_index != -1 else 0
+                    selected_index = (
+                        self.selected_index if self.selected_index != -1 else 0
+                    )
                     if 0 <= selected_index < len(children):
                         selected_button = children[selected_index]
 
                         # Get the display name from the button's label
-                        selected_app_name = selected_button.get_child().get_children()[1].props.label
+                        selected_app_name = (
+                            selected_button.get_child().get_children()[1].props.label
+                        )
 
                         # Find the corresponding DesktopApp object
-                        selected_app = next((app for app in self._all_apps if app.display_name == selected_app_name), None)
+                        selected_app = next(
+                            (
+                                app
+                                for app in self._all_apps
+                                if app.display_name == selected_app_name
+                            ),
+                            None,
+                        )
 
                         if selected_app:
                             # Increment usage count and save
-                            self.app_usage[selected_app_name] = self.app_usage.get(selected_app_name, 0) + 1
+                            self.app_usage[selected_app_name] = (
+                                self.app_usage.get(selected_app_name, 0) + 1
+                            )
                             self.save_app_usage()
 
                             # Launch the app
@@ -367,14 +406,15 @@ class AppLauncher(Box):
         else:
             return self._handle_general_input(event)
 
-
     def _handle_calculator_input(self, event, text):
         if event.keyval == Gdk.KEY_Down:
             self.move_selection(1)
         elif event.keyval == Gdk.KEY_Up:
             self.move_selection(-1)
         elif event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
-            if self.selected_index != -1 and self.selected_index < len(self.calc_history):
+            if self.selected_index != -1 and self.selected_index < len(
+                self.calc_history
+            ):
                 if event.state & Gdk.ModifierType.SHIFT_MASK:
                     self.delete_selected_calc_history()
                 else:
@@ -390,14 +430,15 @@ class AppLauncher(Box):
             return False
         return True
 
-
     def _handle_conversion_input(self, event, text):
         if event.keyval == Gdk.KEY_Down:
             self.move_selection(1)
         elif event.keyval == Gdk.KEY_Up:
             self.move_selection(-1)
         elif event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
-            if self.selected_index != -1 and self.selected_index < len(self.conversion_history):
+            if self.selected_index != -1 and self.selected_index < len(
+                self.conversion_history
+            ):
                 if event.state & Gdk.ModifierType.SHIFT_MASK:
                     self.delete_selected_conversion_history()
                 else:
@@ -413,7 +454,6 @@ class AppLauncher(Box):
             return False
         return True
 
-
     def _handle_general_input(self, event):
         if event.keyval == Gdk.KEY_Down:
             self.move_selection(1)
@@ -424,7 +464,6 @@ class AppLauncher(Box):
         else:
             return False
         return True
-
 
     def notify_text(self, entry, *_):
         """Handle text changes in the search entry"""
@@ -437,7 +476,6 @@ class AppLauncher(Box):
             self.selected_index = -1
         else:
             self.arrange_viewport(text)
-
 
     def move_selection(self, delta: int):
         children = self.viewport.get_children()
@@ -477,19 +515,19 @@ class AppLauncher(Box):
             "ln(": "np.log(",
             "sqrt(": "np.sqrt(",
             "abs(": "np.abs(",
-            "exp(": "np.exp("
+            "exp(": "np.exp(",
         }
         for old, new in replacements.items():
             expr = expr.replace(old, new)
-        expr = re.sub(r'(\d+)!', r'np.factorial(\1)', expr)
+        expr = re.sub(r"(\d+)!", r"np.factorial(\1)", expr)
         for old, new in [("[", "("), ("]", ")"), ("{", "("), ("}", ")")]:
             expr = expr.replace(old, new)
         safe_dict = {
-            'np': np,
-            'math': math,
-            'arange': np.arange,
-            'linspace': np.linspace,
-            'array': np.array
+            "np": np,
+            "math": math,
+            "arange": np.arange,
+            "linspace": np.linspace,
+            "array": np.array,
         }
         try:
             result = eval(expr, {"__builtins__": None}, safe_dict)
@@ -516,15 +554,14 @@ class AppLauncher(Box):
         expr = text.lstrip(";").strip()
         if not expr:
             return
-        try:
-            result_value, result_type = self.converter.parse_input_and_convert(expr)
-            if result_type is None:
-                result_str = f"{result_value:.2f}"
-            else:
-                result_str = f"{result_value:.2f} {result_type}"
-        except:
-            result_str = "Error: Invalid conversion expression"
-        self.conversion_history.insert(0, f"{text} => {result_str}")
+
+        # Add loading entry
+
+        loading_entry = f"{text} => Loading..."
+
+        self.conversion_history.insert(0, loading_entry)
+
+        self.update_conversion_viewport()
         self.save_conversion_history()
         self.update_conversion_viewport()
 
@@ -662,7 +699,9 @@ class AppLauncher(Box):
                 self.update_selection(min(new_index, len(self.calc_history) - 1))
 
     def delete_selected_conversion_history(self):
-        if self.selected_index != -1 and self.selected_index < len(self.conversion_history):
+        if self.selected_index != -1 and self.selected_index < len(
+            self.conversion_history
+        ):
             current_index = self.selected_index
             del self.conversion_history[current_index]
             self.save_conversion_history()

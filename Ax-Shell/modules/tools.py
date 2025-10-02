@@ -1,12 +1,12 @@
 import os
 import subprocess
-import threading
 
 from fabric.utils.helpers import exec_shell_command_async, get_relative_path
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.label import Label
 from gi.repository import Gdk, GLib
+from loguru import logger
 
 import config.data as data
 import modules.icons as icons
@@ -48,7 +48,9 @@ Enter: HEX
 Shift+Enter: RGB
 Ctrl+Enter: HSV"""
 
-tooltip_gamemode = "<b>Game Mode</b>"
+tooltip_gamemode = (
+    "<b>Game Mode</b>\nDisables effects and window animations for better performance."
+)
 tooltip_pomodoro = "<b>Pomodoro Timer</b>"
 tooltip_emoji = "<b>Emoji Picker</b>"
 
@@ -56,7 +58,10 @@ tooltip_emoji = "<b>Emoji Picker</b>"
 class Toolbox(Box):
     def __init__(self, **kwargs):
         orientation = "h"
-        if data.PANEL_THEME == "Panel" and (data.BAR_POSITION in ["Left", "Right"] or data.PANEL_POSITION in ["Start", "End"]):
+        if data.PANEL_THEME == "Panel" and (
+            data.BAR_POSITION in ["Left", "Right"]
+            or data.PANEL_POSITION in ["Start", "End"]
+        ):
             orientation = "v"
 
         super().__init__(
@@ -140,10 +145,7 @@ class Toolbox(Box):
         self.btn_color = Button(
             name="toolbox-button",
             tooltip_markup=tooltip_colorpicker,
-            child=Label(
-                name="button-bar-label",
-                markup=icons.colorpicker
-            ),
+            child=Label(name="button-bar-label", markup=icons.colorpicker),
             h_expand=False,
             v_expand=False,
             h_align="center",
@@ -215,13 +217,31 @@ class Toolbox(Box):
             self.btn_sswindow,
             self.btn_ssfull,
             self.btn_screenshots_folder,
-            Box(name="tool-sep", h_expand=False, v_expand=False, h_align="center", v_align="center"),
+            Box(
+                name="tool-sep",
+                h_expand=False,
+                v_expand=False,
+                h_align="center",
+                v_align="center",
+            ),
             self.btn_screenrecord,
             self.btn_recordings_folder,
-            Box(name="tool-sep", h_expand=False, v_expand=False, h_align="center", v_align="center"),
+            Box(
+                name="tool-sep",
+                h_expand=False,
+                v_expand=False,
+                h_align="center",
+                v_align="center",
+            ),
             self.btn_ocr,
             self.btn_color,
-            Box(name="tool-sep", h_expand=False, v_expand=False, h_align="center", v_align="center"),
+            Box(
+                name="tool-sep",
+                h_expand=False,
+                v_expand=False,
+                h_align="center",
+                v_align="center",
+            ),
             self.btn_gamemode,
             self.btn_pomodoro,
             self.btn_emoji,
@@ -232,9 +252,11 @@ class Toolbox(Box):
 
         self.show_all()
 
-        self.recorder_timer_id = GLib.timeout_add_seconds(1, self.update_screenrecord_state)
-        self.gamemode_updater = GLib.timeout_add_seconds(1, self.gamemode_check)
-        self.pomodoro_updater = GLib.timeout_add_seconds(1, self.pomodoro_check)
+        self.recorder_timer_id = GLib.timeout_add_seconds(
+            2, self.update_screenrecord_state
+        )
+        self.gamemode_updater = GLib.timeout_add_seconds(2, self.gamemode_check)
+        self.pomodoro_updater = GLib.timeout_add_seconds(2, self.pomodoro_check)
 
     def close_menu(self):
         self.notch.close_notch()
@@ -316,34 +338,46 @@ class Toolbox(Box):
         return False
 
     def screenrecord(self, *args):
-
-        exec_shell_command_async(f"bash -c 'nohup bash {SCREENRECORD_SCRIPT} > /dev/null 2>&1 & disown'")
+        exec_shell_command_async(
+            f"bash -c 'nohup bash {SCREENRECORD_SCRIPT} > /dev/null 2>&1 & disown'"
+        )
         self.close_menu()
 
     def pomodoro(self, *args):
-        exec_shell_command_async(f"bash -c 'nohup bash {POMODORO_SCRIPT} > /dev/null 2>&1 & disown'")
+        exec_shell_command_async(
+            f"bash -c 'nohup bash {POMODORO_SCRIPT} > /dev/null 2>&1 & disown'"
+        )
         self.close_menu()
 
     def pomodoro_check(self):
-        def check():
-            try:
-                result = subprocess.run("pgrep -f pomodoro.sh", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                running = result.returncode == 0
-            except Exception:
-                running = False
-
-            def update_ui():
-                if running:
-                    self.btn_pomodoro.get_child().set_markup(icons.timer_on)
-                    self.btn_pomodoro.add_style_class("pomodoro")
-                else:
-                    self.btn_pomodoro.get_child().set_markup(icons.timer_off)
-                    self.btn_pomodoro.remove_style_class("pomodoro")
-                return False
-            GLib.idle_add(update_ui)
-            return False
-        GLib.idle_add(lambda: threading.Thread(target=check).start())
+        """Check pomodoro status using proper background threading"""
+        GLib.Thread.new("pomodoro-check", self._pomodoro_check_thread, None)
         return True
+
+    def _pomodoro_check_thread(self, user_data):
+        """Background thread to check pomodoro status"""
+        try:
+            result = subprocess.run(
+                "pgrep -f pomodoro.sh",
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            running = result.returncode == 0
+        except Exception:
+            running = False
+
+        GLib.idle_add(self._update_pomodoro_ui, running)
+
+    def _update_pomodoro_ui(self, running):
+        """Update pomodoro UI from main thread"""
+        if running:
+            self.btn_pomodoro.get_child().set_markup(icons.timer_on)
+            self.btn_pomodoro.add_style_class("pomodoro")
+        else:
+            self.btn_pomodoro.get_child().set_markup(icons.timer_off)
+            self.btn_pomodoro.remove_style_class("pomodoro")
+        return False
 
     def ocr(self, *args):
         exec_shell_command_async(f"bash {OCR_SCRIPT} s")
@@ -355,34 +389,41 @@ class Toolbox(Box):
         self.close_menu()
 
     def gamemode_check(self):
-        def check():
-            try:
-                result = subprocess.run(f"bash {GAMEMODE_SCRIPT} check", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                enabled = result.stdout == b't\n'
-            except Exception:
-                enabled = False
-
-            def update_ui():
-                if enabled:
-                    self.btn_gamemode.get_child().set_markup(icons.gamemode_off)
-                else:
-                    self.btn_gamemode.get_child().set_markup(icons.gamemode)
-                return False
-            GLib.idle_add(update_ui)
-            return False
-        GLib.idle_add(lambda: threading.Thread(target=check).start())
+        """Check gamemode status using proper background threading"""
+        GLib.Thread.new("gamemode-check", self._gamemode_check_thread, None)
         return True
+
+    def _gamemode_check_thread(self, user_data):
+        """Background thread to check gamemode status"""
+        try:
+            result = subprocess.run(
+                f"bash {GAMEMODE_SCRIPT} check",
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            enabled = result.stdout == b"t\n"
+        except Exception:
+            enabled = False
+
+        GLib.idle_add(self._update_gamemode_ui, enabled)
+
+    def _update_gamemode_ui(self, enabled):
+        """Update gamemode UI from main thread"""
+        if enabled:
+            self.btn_gamemode.get_child().set_markup(icons.gamemode_off)
+        else:
+            self.btn_gamemode.get_child().set_markup(icons.gamemode)
+        return False
 
     def colorpicker(self, button, event):
         if event.type == Gdk.EventType.BUTTON_PRESS:
-            cmd = {
-                1: "-hex",
-                2: "-hsv",
-                3: "-rgb"
-            }.get(event.button)
+            cmd = {1: "-hex", 2: "-hsv", 3: "-rgb"}.get(event.button)
 
             if cmd:
-                exec_shell_command_async(f"bash {get_relative_path('../scripts/hyprpicker.sh')} {cmd}")
+                exec_shell_command_async(
+                    f"bash {get_relative_path('../scripts/hyprpicker.sh')} {cmd}"
+                )
                 self.close_menu()
 
     def colorpicker_key(self, widget, event):
@@ -390,51 +431,66 @@ class Toolbox(Box):
             modifiers = event.get_state()
             cmd = "-hex"
 
-            match modifiers & (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK):
+            match modifiers & (
+                Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.CONTROL_MASK
+            ):
                 case Gdk.ModifierType.SHIFT_MASK:
                     cmd = "-rgb"
                 case Gdk.ModifierType.CONTROL_MASK:
                     cmd = "-hsv"
 
-            exec_shell_command_async(f"bash {get_relative_path('../scripts/hyprpicker.sh')} {cmd}")
+            exec_shell_command_async(
+                f"bash {get_relative_path('../scripts/hyprpicker.sh')} {cmd}"
+            )
             self.close_menu()
             return True
         return False
 
     def update_screenrecord_state(self):
-        def check():
-            try:
-                result = subprocess.run("pgrep -f gpu-screen-recorder", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                running = result.returncode == 0
-            except Exception:
-                running = False
-
-            def update_ui():
-                if running:
-                    self.btn_screenrecord.get_child().set_markup(icons.stop)
-                    self.btn_screenrecord.add_style_class("recording")
-                else:
-                    self.btn_screenrecord.get_child().set_markup(icons.screenrecord)
-                    self.btn_screenrecord.remove_style_class("recording")
-                return False
-            GLib.idle_add(update_ui)
-            return False
-        GLib.idle_add(lambda: threading.Thread(target=check).start())
+        """Check screen recording status using proper background threading"""
+        GLib.Thread.new("screenrecord-check", self._screenrecord_check_thread, None)
         return True
 
+    def _screenrecord_check_thread(self, user_data):
+        """Background thread to check screen recording status"""
+        try:
+            result = subprocess.run(
+                "pgrep -f gpu-screen-recorder",
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            running = result.returncode == 0
+        except Exception:
+            running = False
+
+        GLib.idle_add(self._update_screenrecord_ui, running)
+
+    def _update_screenrecord_ui(self, running):
+        """Update screen recording UI from main thread"""
+        if running:
+            self.btn_screenrecord.get_child().set_markup(icons.stop)
+            self.btn_screenrecord.add_style_class("recording")
+        else:
+            self.btn_screenrecord.get_child().set_markup(icons.screenrecord)
+            self.btn_screenrecord.remove_style_class("recording")
+        return False
+
     def open_screenshots_folder(self, *args):
-        screenshots_dir = os.path.join(os.environ.get('XDG_PICTURES_DIR',
-                                                    os.path.expanduser('~/Pictures')),
-                                     'Screenshots')
+        screenshots_dir = os.path.join(
+            os.environ.get("XDG_PICTURES_DIR", os.path.expanduser("~/Pictures")),
+            "Screenshots",
+        )
 
         os.makedirs(screenshots_dir, exist_ok=True)
         exec_shell_command_async(f"xdg-open {screenshots_dir}")
         self.close_menu()
 
     def open_recordings_folder(self, *args):
-        recordings_dir = os.path.join(os.environ.get('XDG_VIDEOS_DIR',
-                                                   os.path.expanduser('~/Videos')),
-                                    'Recordings')
+        recordings_dir = os.path.join(
+            os.environ.get("XDG_VIDEOS_DIR", os.path.expanduser("~/Videos")),
+            "Recordings",
+        )
 
         os.makedirs(recordings_dir, exist_ok=True)
         exec_shell_command_async(f"xdg-open {recordings_dir}")
