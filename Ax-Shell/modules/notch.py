@@ -122,7 +122,7 @@ class Notch(Window):
 
         super().__init__(
             name="notch",
-            layer="top",
+            layer="overlay",
             anchor=anchor_val,
             margin=current_margin_str,
             keyboard_mode="none",
@@ -139,6 +139,7 @@ class Notch(Window):
 
         self.bar = kwargs.get("bar", None)
         self.is_hovered = False
+        self.connect("realize", self._on_realize)
         self._prevent_occlusion = False
         self._occlusion_timer_id = None
 
@@ -409,12 +410,17 @@ class Notch(Window):
 
         self._current_window_class = self._get_current_window_class()
 
-        if data.PANEL_THEME == "Notch" and data.BAR_POSITION != "Top":
-            GLib.timeout_add(2000, self._check_occlusion)  # Throttled to 2000ms
-            print(
-                f"[{time.strftime('%H:%M:%S')}] Started occlusion check timer (2000ms)"
-            )
-        elif data.PANEL_THEME == "Notch":
+        # Always enable occlusion detection for fullscreen windows
+
+
+
+        GLib.timeout_add(500, self._check_occlusion)
+
+
+
+
+
+        if data.PANEL_THEME == "Notch":
             self.notch_revealer.set_reveal_child(True)
         else:
             self.notch_revealer.set_reveal_child(False)
@@ -428,7 +434,14 @@ class Notch(Window):
         if window:
             window.set_cursor(Gdk.Cursor(Gdk.CursorType.HAND2))
         return True
+    def _on_realize(self, widget):
 
+
+
+        """Ensure the notch window is raised above the bar."""
+
+
+        self.get_window().raise_()
     def on_button_leave(self, widget, event):
         print(f"[{time.strftime('%H:%M:%S')}] Notch button leave: {widget.name}")
         if event.detail == Gdk.NotifyType.INFERIOR:

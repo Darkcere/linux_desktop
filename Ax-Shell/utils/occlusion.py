@@ -1,77 +1,59 @@
 import subprocess
 import json
-import time
 
 import config.data as data
 
-# Cache for workspace and monitor data
-_last_workspace_check = 0
-_last_workspace_id = -1
-_last_monitor_check = 0
-_monitor_cache = None
-_cache_timeout = 5.0  # Cache for 5 seconds
-
 def get_current_workspace():
     """
-    Get the current workspace ID using hyprctl, with caching.
+    Get the current workspace ID using hyprctl.
     """
-    global _last_workspace_check, _last_workspace_id
-    current_time = time.time()
-    if current_time - _last_workspace_check < _cache_timeout:
-        print(f"[{time.strftime('%H:%M:%S')}] Using cached workspace ID: {_last_workspace_id}")
-        return _last_workspace_id
-
     try:
         result = subprocess.run(
             ["hyprctl", "activeworkspace"],
             capture_output=True,
             text=True
         )
+        # Assume the output similar to: "ID <number>"
+        # Extracting the number from the output
         parts = result.stdout.split()
         for i, part in enumerate(parts):
             if part == "ID" and i + 1 < len(parts):
-                _last_workspace_id = int(parts[i + 1])
-                _last_workspace_check = current_time
-                print(f"[{time.strftime('%H:%M:%S')}] Fetched workspace ID: {_last_workspace_id}")
-                return _last_workspace_id
+                return int(parts[i+1])
     except Exception as e:
-        print(f"[{time.strftime('%H:%M:%S')}] Error getting current workspace: {e}")
+        print(f"Error getting current workspace: {e}")
     return -1
 
 def get_screen_dimensions():
     """
-    Get screen dimensions from hyprctl, with caching.
-
+    Get screen dimensions from hyprctl.
+    
     Returns:
         tuple: (width, height) of the monitor containing the current workspace
     """
-    global _last_monitor_check, _monitor_cache
-    current_time = time.time()
-    if current_time - _last_monitor_check < _cache_timeout and _monitor_cache:
-        print(f"[{time.strftime('%H:%M:%S')}] Using cached monitor dimensions: {_monitor_cache}")
-        return _monitor_cache
-
     try:
+        # Get current workspace
         workspace_id = get_current_workspace()
+        
+        # Get monitor information
         result = subprocess.run(
             ["hyprctl", "-j", "monitors"],
             capture_output=True,
             text=True
         )
         monitors = json.loads(result.stdout)
+        
+        # Find the monitor containing our workspace
         for monitor in monitors:
             if monitor.get("activeWorkspace", {}).get("id") == workspace_id:
-                _monitor_cache = (monitor.get("width", data.CURRENT_WIDTH), monitor.get("height", data.CURRENT_HEIGHT))
-                _last_monitor_check = current_time
-                print(f"[{time.strftime('%H:%M:%S')}] Fetched monitor dimensions: {_monitor_cache}")
-                return _monitor_cache
+                return monitor.get("width", data.CURRENT_WIDTH), monitor.get("height", data.CURRENT_HEIGHT)
+                
+        # Fallback to first monitor
         if monitors:
-            _monitor_cache = (monitors[0].get("width", data.CURRENT_WIDTH), monitors[0].get("height", data.CURRENT_HEIGHT))
-            _last_monitor_check = current_time
-            print(f"[{time.strftime('%H:%M:%S')}] Fetched fallback monitor dimensions: {_monitor_cache}")
-            return _monitor_cache
+            return monitors[0].get("width", data.CURRENT_WIDTH), monitors[0].get("height", data.CURRENT_HEIGHT)
     except Exception as e:
-        print(f"[{time.strftime('%H:%M:%S')}] Error getting screen dimensions: {e}")
+        print(f"Error getting screen dimensions: {e}")
+    
+    # Default fallback values
     return data.CURRENT_WIDTH, data.CURRENT_HEIGHT
 
 def check_occlusion(occlusion_region, workspace=None):
@@ -88,14 +70,16 @@ def check_occlusion(occlusion_region, workspace=None):
     Returns:
         bool: True if any window overlaps with the occlusion region, False otherwise.
     """
-    print(f"[{time.strftime('%H:%M:%S')}] Checking occlusion for region: {occlusion_region}")
     if workspace is None:
         workspace = get_current_workspace()
-
+    
+    # Handle simplified side-based format
     if isinstance(occlusion_region, tuple) and len(occlusion_region) == 2:
         side, size = occlusion_region
         if isinstance(side, str):
+            # Convert side-based format to coordinates
             screen_width, screen_height = get_screen_dimensions()
+            
             if side.lower() == "bottom":
                 occlusion_region = (0, screen_height - size, screen_width, size)
             elif side.lower() == "top":
@@ -104,9 +88,10 @@ def check_occlusion(occlusion_region, workspace=None):
                 occlusion_region = (0, 0, size, screen_height)
             elif side.lower() == "right":
                 occlusion_region = (screen_width - size, 0, size, screen_height)
-
+    
+    # Ensure occlusion_region is in the correct format (x, y, width, height)
     if not isinstance(occlusion_region, tuple) or len(occlusion_region) != 4:
-        print(f"[{time.strftime('%H:%M:%S')}] Invalid occlusion region format: {occlusion_region}")
+        print(f"Invalid occlusion region format: {occlusion_region}")
         return False
 
     try:
@@ -117,29 +102,45 @@ def check_occlusion(occlusion_region, workspace=None):
         )
         clients = json.loads(result.stdout)
     except Exception as e:
-        print(f"[{time.strftime('%H:%M:%S')}] Error retrieving client windows: {e}")
+        print(f"Error retrieving client windows: {e}")
         return False
 
     occ_x, occ_y, occ_width, occ_height = occlusion_region
     occ_x2 = occ_x + occ_width
     occ_y2 = occ_y + occ_height
 
+    # Get screen dimensions for fullscreen check
+    screen_width, screen_height = get_screen_dimensions()
+
     for client in clients:
+        # Check if client is mapped
         if not client.get("mapped", False):
             continue
+
+        # Ensure client has proper workspace information and matches the workspace
         client_workspace = client.get("workspace", {})
         if client_workspace.get("id") != workspace:
             continue
+
+        # Ensure client has position and size info
         position = client.get("at")
         size = client.get("size")
         if not position or not size:
             continue
+
         x, y = position
         width, height = size
         win_x1, win_y1 = x, y
         win_x2, win_y2 = x + width, y + height
+
+        # Check for fullscreen windows (size matches screen and positioned at 0,0)
+        if (width, height) == (screen_width, screen_height) and (x, y) == (0, 0):
+            # For fullscreen windows, check if occlusion region is the top area
+            if occ_y == 0 and occ_height > 0:  # Top region
+                return True  # Consider fullscreen as occluding the top
+
+        # Check for intersection between the window and occlusion region
         if not (win_x2 <= occ_x or win_x1 >= occ_x2 or win_y2 <= occ_y or win_y1 >= occ_y2):
-            print(f"[{time.strftime('%H:%M:%S')}] Occlusion detected for window: {client.get('title', 'unknown')}")
-            return True
-    print(f"[{time.strftime('%H:%M:%S')}] No occlusion detected")
-    return False
+            return True  # Occlusion region is occupied
+
+    return False  # No window overlaps the occlusion region
