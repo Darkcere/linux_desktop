@@ -39,7 +39,8 @@ case $1 in
         ;;
 esac
 
-
+if [ -f "$full_path" ]; then
+   \
 
     ACTION=$(notify-send -a "Ax-Shell" -i "$full_path" "Screenshot saved" "in $full_path" \
         -A "view=View" -A "edit=Edit" -A "open=Open Folder")
