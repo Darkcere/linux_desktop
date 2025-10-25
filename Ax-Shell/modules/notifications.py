@@ -1567,7 +1567,7 @@ class NotificationPopup(Window):
         super().__init__(
             name="notification-popup",
             anchor=f"{x_pos} {y_pos}",
-            layer="top",
+            layer="overlay",
             keyboard_mode="none",
             exclusivity="none",
             visible=True,

@@ -28,7 +28,7 @@ case $1 in
         hyprshot -s -m output -m active -o "$save_dir" -f "$save_file"
         ;;
     s)
-        hyprshot -z -m region -o "$save_dir" -f "$save_file"
+        hyprshot -s -z -m region -o "$save_dir" -f "$save_file"
         ;;
     w)
         hyprshot -s -m window -m active -o "$save_dir" -f "$save_file";
