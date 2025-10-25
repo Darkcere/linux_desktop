@@ -39,9 +39,14 @@ class WallpaperSelector(Box):
         self.search_timeout_id = None
         self.is_searching = False
 
-        self.page_size = 10
+        self.page_size = 9
         self.current_page = 0
         self.total_pages = math.ceil(len(self.files) / self.page_size) if self.files else 1
+
+        self.search_page_size = self.page_size
+        self.search_files = []
+        self.search_current_page = 0
+        self.search_total_pages = 0
 
         self.viewport = Gtk.IconView(name="wallpaper-icons")
         self.viewport.set_model(Gtk.ListStore(GdkPixbuf.Pixbuf, str, str))
@@ -150,9 +155,9 @@ class WallpaperSelector(Box):
         self.add(self.header_box)
         self.add(self.current_wallpaper_label)
         self.prev_button = Button(label="Previous", name="prev-page-button")
-        self.prev_button.connect("clicked", self.on_prev_page_clicked)
+        self.prev_button.connect("clicked", self.on_prev_clicked)
         self.next_button = Button(label="Next", name="next-page-button")
-        self.next_button.connect("clicked", self.on_next_page_clicked)
+        self.next_button.connect("clicked", self.on_next_clicked)
         self.page_label = Label(label=f"Page {self.current_page + 1} of {self.total_pages}", name="page-label")
         self.pagination_box = Box(
             name="pagination-box",
@@ -216,15 +221,25 @@ class WallpaperSelector(Box):
             print(f"Error reading current wallpaper: {e}")
             self.current_wallpaper_label.set_label("Current Wallpaper: Error")
 
-    def on_prev_page_clicked(self, button):
-        if self.current_page > 0:
-            self.current_page -= 1
-            self._load_page(self.current_page)
+    def on_prev_clicked(self, button):
+        if self.is_searching:
+            if self.search_current_page > 0:
+                self.search_current_page -= 1
+                self._load_search_page(self.search_current_page)
+        else:
+            if self.current_page > 0:
+                self.current_page -= 1
+                self._load_page(self.current_page)
 
-    def on_next_page_clicked(self, button):
-        if self.current_page < self.total_pages - 1:
-            self.current_page += 1
-            self._load_page(self.current_page)
+    def on_next_clicked(self, button):
+        if self.is_searching:
+            if self.search_current_page < self.search_total_pages - 1:
+                self.search_current_page += 1
+                self._load_search_page(self.search_current_page)
+        else:
+            if self.current_page < self.total_pages - 1:
+                self.current_page += 1
+                self._load_page(self.current_page)
 
     def _get_files_recursive(self, directory: str) -> list[str]:
         image_files = []
@@ -244,8 +259,9 @@ class WallpaperSelector(Box):
             return
 
         self.current_page = page
+        model = self.viewport.get_model()
+        model.clear()
         self.thumbnails.clear()
-        self.viewport.get_model().clear()
         self.selected_index = -1
 
         start = page * self.page_size
@@ -254,52 +270,71 @@ class WallpaperSelector(Box):
         batch_files = self.files[start:end]
 
         futures = [self.executor.submit(self._process_file_for_thumb, file_path) for file_path in batch_files]
+        results = [future.result() for future in futures]
 
-        for future in futures:
-            future.add_done_callback(lambda f: GLib.idle_add(self._add_thumbnail_to_ui, f))
+        GLib.idle_add(self._add_batch_thumbnails, results)
 
         self.update_pagination_ui()
 
-    def update_pagination_ui(self):
-        self.page_label.set_label(f"Page {self.current_page + 1} of {self.total_pages}")
-        self.prev_button.set_sensitive(self.current_page > 0)
-        self.next_button.set_sensitive(self.current_page < self.total_pages - 1)
+    def _load_search_page(self, page: int):
+        if not 0 <= page < self.search_total_pages or not self.search_files:
+            return
 
-    def _process_file_for_thumb(self, full_path: str):
-        cache_path = self._get_cache_path(full_path)
-        if not os.path.exists(cache_path):
-            try:
-                with Image.open(full_path) as img:
-                    width, height = img.size
-                    side = min(width, height)
-                    left = (img.width - side) // 2
-                    top = (height - side) // 2
-                    right = left + side
-                    bottom = top + side
-                    img_cropped = img.crop((left, top, right, bottom))
-                    img_cropped.thumbnail((96, 96), Image.Resampling.LANCZOS)
-                    img_cropped.save(cache_path, "PNG")
-            except Exception as e:
-                print(f"Error processing {full_path}: {e}")
-                return None
-        return cache_path, full_path
+        self.search_current_page = page
+        model = self.viewport.get_model()
+        model.clear()
+        self.thumbnails.clear()
+        self.selected_index = -1
 
-    def _add_thumbnail_to_ui(self, future: concurrent.futures.Future):
-        result = future.result()
-        if result:
-            cache_path, file_name = result
+        start = page * self.search_page_size
+        end = min(start + self.search_page_size, len(self.search_files))
+
+        batch_files = self.search_files[start:end]
+
+        futures = [self.executor.submit(self._process_file_for_thumb, file_path) for file_path in batch_files]
+        results = [future.result() for future in futures]
+
+        GLib.idle_add(self._add_batch_thumbnails, results)
+
+        self.update_pagination_ui()
+
+    def _add_batch_thumbnails(self, results):
+        model = self.viewport.get_model()
+        for result in results:
+            if result is None:
+                continue
+            cache_path, full_path = result
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file(cache_path)
-                self.thumbnails.append((pixbuf, file_name))
-                display_name = os.path.relpath(file_name, data.WALLPAPERS_DIR)
-                self.viewport.get_model().append([pixbuf, file_name, display_name])
-
-                if self.selected_index == -1 and not self.is_searching:
-                    self.update_selection(0)
-
+                display_name = os.path.relpath(full_path, data.WALLPAPERS_DIR)
+                model.append([pixbuf, full_path, display_name])
             except Exception as e:
-                print(f"Error loading thumbnail {cache_path}: {e}")
+                print(f"Error adding thumbnail {cache_path}: {e}")
+
+        if len(model) > 0 and self.selected_index == -1:
+            self.update_selection(0)
+
         return False
+
+    def update_pagination_ui(self):
+        if self.is_searching and len(self.search_files) == 0:
+            self.page_label.set_label("No results found")
+            self.prev_button.set_sensitive(False)
+            self.next_button.set_sensitive(False)
+            return
+
+        if self.is_searching:
+            page_num = self.search_current_page + 1
+            total_p = self.search_total_pages
+        else:
+            page_num = self.current_page + 1
+            total_p = self.total_pages
+
+        self.page_label.set_label(f"Page {page_num} of {total_p}")
+        current_p = self.search_current_page if self.is_searching else self.current_page
+        total_p = self.search_total_pages if self.is_searching else self.total_pages
+        self.prev_button.set_sensitive(current_p > 0)
+        self.next_button.set_sensitive(current_p < total_p - 1)
 
     def randomize_dice_icon(self):
         dice_icons = [
@@ -385,20 +420,25 @@ class WallpaperSelector(Box):
         return False
 
     def arrange_viewport(self, query: str = ""):
+        query = query.strip()
+        if hasattr(self, "last_query") and query == self.last_query:
+            return  # Ignore redundant triggers
+        self.last_query = query
+
         if self.search_timeout_id:
             GLib.source_remove(self.search_timeout_id)
             self.search_timeout_id = None
 
-        if not query.strip():
+        if not query:
             if self.is_searching:
                 self.is_searching = False
-            self.pagination_box.show_all()
+            self.pagination_box.show()
             self._load_page(self.current_page)
             return
 
         self.is_searching = True
-        self.pagination_box.hide()
-        self.search_timeout_id = GLib.timeout_add(300, self._start_threaded_search, query)
+        self.pagination_box.show()
+        self.search_timeout_id = GLib.timeout_add(500, self._start_threaded_search, query)
 
     def _start_threaded_search(self, query: str):
         self.search_timeout_id = None
@@ -406,26 +446,19 @@ class WallpaperSelector(Box):
         future.add_done_callback(lambda f: GLib.idle_add(self._update_search_results, f))
         return False
 
-    def _perform_fuzzy_search(self, query: str) -> list:
-        query = query.casefold().strip()
-        if not query:
+    def _perform_fuzzy_search(self, query: str) -> list[str]:
+        query_lower = query.casefold().strip()
+        if not query_lower:
             return []
 
-        scored_thumbnails = []
-        for file_name in self.files:
-            display_name = os.path.relpath(file_name, data.WALLPAPERS_DIR)
-            if query in display_name.casefold():
-                result = self._process_file_for_thumb(file_name)
-                if result:
-                    cache_path, file_name_result = result
-                    try:
-                        pixbuf = GdkPixbuf.Pixbuf.new_from_file(cache_path)
-                        scored_thumbnails.append((100, pixbuf, file_name_result, display_name))
-                    except Exception as e:
-                        print(f"Error loading thumbnail for search: {e}")
+        matching = []
+        for file_path in self.files:
+            display_name = os.path.relpath(file_path, data.WALLPAPERS_DIR).casefold()
+            if query_lower in display_name:
+                matching.append(file_path)
 
-        scored_thumbnails.sort(key=lambda x: x[2])
-        return scored_thumbnails[:]
+        matching.sort(key=lambda x: os.path.basename(x).lower())
+        return matching
 
     def _update_search_results(self, future: concurrent.futures.Future):
         model = self.viewport.get_model()
@@ -434,15 +467,21 @@ class WallpaperSelector(Box):
         self.selected_index = -1
 
         try:
-            scored_thumbnails = future.result()
-            for _, pixbuf, file_name, display_name in scored_thumbnails:
-                model.append([pixbuf, file_name, display_name])
+            self.search_files = future.result()
+            self.search_total_pages = math.ceil(len(self.search_files) / self.search_page_size) if self.search_files else 0
+            if self.search_total_pages == 0:
+                self.page_label.set_label("No results found")
+                self.prev_button.set_sensitive(False)
+                self.next_button.set_sensitive(False)
+                self.viewport.unselect_all()
+                self.selected_index = -1
+            else:
+                self._load_search_page(0)
         except Exception as e:
             print(f"Error getting search results: {e}")
-
-        if len(model) > 0:
-            self.update_selection(0)
-        else:
+            self.page_label.set_label("Search error")
+            self.prev_button.set_sensitive(False)
+            self.next_button.set_sensitive(False)
             self.viewport.unselect_all()
             self.selected_index = -1
 
@@ -496,10 +535,10 @@ class WallpaperSelector(Box):
         new_index = self._get_new_index(keyval, current_index, columns, total_items)
 
         if new_index == "prev_page":
-            self.on_prev_page_clicked(None)
+            self.on_prev_clicked(None)
             return
         elif new_index == "next_page":
-            self.on_next_page_clicked(None)
+            self.on_next_clicked(None)
             return
 
         if 0 <= new_index < total_items and new_index != self.selected_index:
@@ -542,13 +581,25 @@ class WallpaperSelector(Box):
         elif keyval == Gdk.KEY_Left:
             if current_index > 0:
                 return current_index - 1
-            elif not self.is_searching and self.current_page > 0:
-                return "prev_page"
+            else:
+                if self.is_searching:
+                    if self.search_current_page > 0:
+                        return "prev_page"
+                else:
+                    if self.current_page > 0:
+                        return "prev_page"
+                return current_index
         elif keyval == Gdk.KEY_Right:
             if current_index < total_items - 1:
                 return current_index + 1
-            elif not self.is_searching and self.current_page < self.total_pages - 1:
-                return "next_page"
+            else:
+                if self.is_searching:
+                    if self.search_current_page < self.search_total_pages - 1:
+                        return "next_page"
+                else:
+                    if self.current_page < self.total_pages - 1:
+                        return "next_page"
+                return current_index
         return current_index
 
     def update_selection(self, new_index: int):
@@ -567,6 +618,25 @@ class WallpaperSelector(Box):
         unique_key = f"{full_path}-{mtime}"
         file_hash = hashlib.md5(unique_key.encode("utf-8")).hexdigest()
         return os.path.join(self.CACHE_DIR, f"{file_hash}.png")
+
+    def _process_file_for_thumb(self, full_path: str):
+        cache_path = self._get_cache_path(full_path)
+        if not os.path.exists(cache_path):
+            try:
+                with Image.open(full_path) as img:
+                    width, height = img.size
+                    side = min(width, height)
+                    left = (img.width - side) // 2
+                    top = (height - side) // 2
+                    right = left + side
+                    bottom = top + side
+                    img_cropped = img.crop((left, top, right, bottom))
+                    img_cropped.thumbnail((96, 96), Image.Resampling.LANCZOS)
+                    img_cropped.save(cache_path, "PNG")
+            except Exception as e:
+                print(f"Error processing {full_path}: {e}")
+                return None
+        return cache_path, full_path
 
     @staticmethod
     def _is_image(file_path: str) -> bool:
