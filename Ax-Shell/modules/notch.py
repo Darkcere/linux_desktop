@@ -479,7 +479,7 @@ class Notch(Window):
         if data.PANEL_THEME != "Notch":
             self.notch_revealer.set_reveal_child(False)
         # Force icon update after a short delay to account for focus change
-        GLib.timeout_add(100, self.update_window_icon)
+        GLib.timeout_add(300, self.update_window_icon)
 
     def open_notch(self, widget_name: str):
         print(f"[{time.strftime('%H:%M:%S')}] Opening notch: {widget_name}")

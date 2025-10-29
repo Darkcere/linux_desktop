@@ -51,7 +51,7 @@
     "bar_workspace_use_chinese_numerals": true,
     "bar_hide_special_workspace": true,
     "bar_theme": "Pills",
-    "dock_theme": "Pills",
+    "dock_theme": "Edge",
     "panel_theme": "Notch",
     "panel_position": "Center",
     "notif_pos": "Top",

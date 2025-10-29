@@ -226,10 +226,20 @@ class WallpaperSelector(Box):
             if self.search_current_page > 0:
                 self.search_current_page -= 1
                 self._load_search_page(self.search_current_page)
+                # ✅ Select the last item on the new page
+                GLib.idle_add(self.update_selection, self.page_last_index())
         else:
             if self.current_page > 0:
                 self.current_page -= 1
                 self._load_page(self.current_page)
+                # ✅ Select the last item on the new page
+                GLib.idle_add(self.update_selection, self.page_last_index())
+    def page_last_index(self) -> int:
+        """Return the last index of the current page's items."""
+        model = self.viewport.get_model()
+        total_items = len(model)
+        return total_items - 1 if total_items > 0 else -1
+
 
     def on_next_clicked(self, button):
         if self.is_searching:
@@ -386,7 +396,10 @@ class WallpaperSelector(Box):
             )
         print(f"Set wallpaper: {os.path.basename(full_path)}")
         self.update_current_wallpaper_label()
-
+        
+        exec_shell_command_async(
+                f'fabric-cli exec ax-shell notch.close_notch()'
+            )
     def set_random_wallpaper(self, widget, external=False):
         if not self.files:
             print("No wallpapers available to set a random one.")
@@ -500,6 +513,7 @@ class WallpaperSelector(Box):
     def on_search_entry_key_press(self, widget, event):
         if event.state & Gdk.ModifierType.SHIFT_MASK:
             if event.keyval in (Gdk.KEY_Up, Gdk.KEY_Down):
+                # Existing scheme change logic
                 schemes_list = list(self.schemes.keys())
                 current_id = self.scheme_dropdown.get_active_id()
                 current_index = schemes_list.index(current_id) if current_id in schemes_list else 0
@@ -510,9 +524,14 @@ class WallpaperSelector(Box):
                 self.scheme_dropdown.popup()
                 return True
 
-        if event.keyval in (Gdk.KEY_Up, Gdk.KEY_Down, Gdk.KEY_Left, Gdk.KEY_Right):
+        # MODIFIED: Only intercept Up and Down keys for wallpaper navigation.
+        if event.keyval in (Gdk.KEY_Up, Gdk.KEY_Down):
             self.move_selection_2d(event.keyval)
-            return True
+            return True # Consume the event so the entry doesn't process it.
+        
+        # Left and Right keys are now implicitly ignored here, allowing the Gtk.Entry 
+        # to handle them, moving the text cursor.
+
         elif event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
             if self.selected_index != -1:
                 model = self.viewport.get_model()
@@ -522,7 +541,8 @@ class WallpaperSelector(Box):
                     full_path = model.get_value(iter_obj, 1)
                     self._set_wallpaper_from_path(full_path)
             return True
-        return False
+            
+        return False # This ensures Left and Right keys (and others) are passed to the Gtk.Entry.
 
     def move_selection_2d(self, keyval):
         model = self.viewport.get_model()
@@ -573,12 +593,7 @@ class WallpaperSelector(Box):
             elif keyval in (Gdk.KEY_Up, Gdk.KEY_Left):
                 return total_items - 1
             return -1
-
-        if keyval == Gdk.KEY_Up:
-            return current_index - columns if current_index - columns >= 0 else current_index
-        elif keyval == Gdk.KEY_Down:
-            return current_index + columns if current_index + columns < total_items else current_index
-        elif keyval == Gdk.KEY_Left:
+        elif keyval == Gdk.KEY_Up:
             if current_index > 0:
                 return current_index - 1
             else:
@@ -589,7 +604,7 @@ class WallpaperSelector(Box):
                     if self.current_page > 0:
                         return "prev_page"
                 return current_index
-        elif keyval == Gdk.KEY_Right:
+        elif keyval == Gdk.KEY_Down:
             if current_index < total_items - 1:
                 return current_index + 1
             else:
