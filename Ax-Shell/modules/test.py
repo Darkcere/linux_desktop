@@ -1,6 +1,6 @@
 import json
 import os
-
+import time
 from fabric.hyprland.service import HyprlandEvent
 from fabric.hyprland.widgets import HyprlandLanguage as Language
 from fabric.hyprland.widgets import HyprlandWorkspaces as Workspaces
@@ -26,38 +26,33 @@ from widgets.wayland import WaylandWindow as Window
 
 CHINESE_NUMERALS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "〇"]
 
-# Tooltips
 tooltip_apps = f"""<b><u>Launcher</u></b>
 <b>• Apps:</b> Type to search.
 
 <b>• Calculator [Prefix "="]:</b> Solve a math expression.
-  e.g. "=2+2"
+  e.g. "=2+2"
 
 <b>• Converter [Prefix ";"]:</b> Convert between units.
-  e.g. ";100 USD to EUR", ";10 km to miles"
+  e.g. ";100 USD to EUR", ";10 km to miles"
 
 <b>• Special Commands [Prefix ":"]:</b>
-  :update - Open {data.APP_NAME_CAP}'s updater.
-  :d - Open Dashboard.
-  :w - Open Wallpapers."""
+  :d - Open Dashboard.
+  :w - Open Wallpapers."""
 
 tooltip_power = """<b>Power Menu</b>"""
 tooltip_tools = """<b>Toolbox</b>"""
 tooltip_overview = """<b>Overview</b>"""
 
-
 class Bar(Window):
-    def __init__(self, monitor_id: int = 0, **kwargs):
-        self.monitor_id = monitor_id
-        
+    def __init__(self, **kwargs):
         super().__init__(
             name="bar",
             layer="top",
             exclusivity="auto",
             visible=True,
             all_visible=True,
-            monitor=monitor_id,
         )
+        print(f"[{time.strftime('%H:%M:%S')}] Initializing Bar")
 
         self.anchor_var = ""
         self.margin_var = ""
@@ -99,12 +94,6 @@ class Bar(Window):
         self.dock_instance = None
         self.integrated_dock_widget = None
 
-        # Calculate workspace range based on monitor_id
-        # Monitor 0: workspaces 1-10, Monitor 1: workspaces 11-20, etc.
-        start_workspace = self.monitor_id * 10 + 1
-        end_workspace = start_workspace + 10
-        workspace_range = range(start_workspace, end_workspace)
-
         self.workspaces = Workspaces(
             name="workspaces",
             invert_scroll=True,
@@ -122,7 +111,7 @@ class Bar(Window):
                     label=None,
                     style_classes=["vertical"] if data.VERTICAL else None,
                 )
-                for i in workspace_range
+                for i in range(1, 11)
             ],
             buttons_factory=(
                 None
@@ -146,13 +135,13 @@ class Bar(Window):
                     v_align="center",
                     id=i,
                     label=(
-                        CHINESE_NUMERALS[(i - start_workspace)]
+                        CHINESE_NUMERALS[i - 1]
                         if data.BAR_WORKSPACE_USE_CHINESE_NUMERALS
-                        and 0 <= (i - start_workspace) < len(CHINESE_NUMERALS)
+                        and 1 <= i <= len(CHINESE_NUMERALS)
                         else str(i)
                     ),
                 )
-                for i in workspace_range
+                for i in range(1, 11)
             ],
             buttons_factory=(
                 None
@@ -195,7 +184,6 @@ class Bar(Window):
         self.on_language_switch()
         self.connection.connect("event::activelayout", self.on_language_switch)
 
-        # Determine date-time format based on the new setting
         if data.DATETIME_12H_FORMAT:
             time_format_horizontal = "%I:%M %p"
             time_format_vertical = "%I\n%M\n%p"
@@ -203,6 +191,7 @@ class Bar(Window):
             time_format_horizontal = "%H:%M"
             time_format_vertical = "%H\n%M"
 
+        # Throttle DateTime updates to every 5 seconds
         self.date_time = DateTime(
             name="date-time",
             formatters=(
@@ -215,7 +204,9 @@ class Bar(Window):
             h_expand=True,
             v_expand=True,
             style_classes=["vertical"] if data.VERTICAL else [],
+            interval=5000,
         )
+        print(f"[{time.strftime('%H:%M:%S')}] DateTime initialized with interval=5000ms")
 
         self.button_apps = Button(
             name="button-bar",
@@ -344,13 +335,12 @@ class Bar(Window):
         self.v_all_children.extend(self.v_center_children)
         self.v_all_children.extend(self.v_end_children)
 
-        # Create embedded dock when bar is in center position (regardless of DOCK_ENABLED setting)
-        should_embed_dock = (
-            data.BAR_POSITION == "Bottom"
-            or (data.PANEL_THEME == "Panel" and data.BAR_POSITION in ["Top", "Bottom"])
-        )
-        
-        if should_embed_dock:
+        if (
+            data.DOCK_ENABLED
+            and data.BAR_POSITION == "Bottom"
+            or data.PANEL_THEME == "Panel"
+            and data.BAR_POSITION in ["Top", "Bottom"]
+        ):
             if not data.VERTICAL:
                 self.dock_instance = Dock(integrated_mode=True)
                 self.integrated_dock_widget = self.dock_instance.wrapper
@@ -560,48 +550,51 @@ class Bar(Window):
                 except Exception as e:
                     print(f"Error updating config file: {e}")
 
-            return self.component_visibility[component_name]
-
-        return None
+        return self.component_visibility[component_name]
 
     def on_button_enter(self, widget, event):
+        print(f"[{time.strftime('%H:%M:%S')}] Button enter event: {widget.name}")
         window = widget.get_window()
         if window:
             window.set_cursor(Gdk.Cursor.new_from_name(widget.get_display(), "hand2"))
 
     def on_button_leave(self, widget, event):
+        print(f"[{time.strftime('%H:%M:%S')}] Button leave event: {widget.name}")
         window = widget.get_window()
         if window:
             window.set_cursor(None)
 
     def on_button_clicked(self, *args):
+        print(f"[{time.strftime('%H:%M:%S')}] Button clicked")
         exec_shell_command_async("notify-send 'Botón presionado' '¡Funciona!'")
 
     def search_apps(self):
+        print(f"[{time.strftime('%H:%M:%S')}] Opening launcher")
         if self.notch:
             self.notch.open_notch("launcher")
 
     def overview(self):
+        print(f"[{time.strftime('%H:%M:%S')}] Opening overview")
         if self.notch:
             self.notch.open_notch("overview")
 
     def power_menu(self):
+        print(f"[{time.strftime('%H:%M:%S')}] Opening power menu")
         if self.notch:
             self.notch.open_notch("power")
 
     def tools_menu(self):
+        print(f"[{time.strftime('%H:%M:%S')}] Opening tools menu")
         if self.notch:
             self.notch.open_notch("tools")
 
     def on_language_switch(self, _=None, event: HyprlandEvent = None):
-        try:
-            lang_data = (
-                event.data[1]
-                if event and event.data and len(event.data) > 1
-                else Language().get_label()
-            )
-        except json.JSONDecodeError:
-            lang_data = "UNK"  # Fallback to default language label
+        print(f"[{time.strftime('%H:%M:%S')}] Language switch event")
+        lang_data = (
+            event.data[1]
+            if event and event.data and len(event.data) > 1
+            else Language().get_label()
+        )
         self.language.set_tooltip_text(lang_data)
         if not data.VERTICAL:
             self.lang_label.set_label(lang_data[:3].upper())
@@ -619,6 +612,7 @@ class Bar(Window):
             if self.notch:
                 # Focus the notch window to bring it to front
                 GLib.idle_add(lambda: exec_shell_command_async("hyprctl dispatch focuswindow class:notch") if self.notch else None)
+
 
     def chinese_numbers(self):
         if data.BAR_WORKSPACE_USE_CHINESE_NUMERALS:

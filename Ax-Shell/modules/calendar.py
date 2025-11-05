@@ -41,13 +41,13 @@ class Calendar(Gtk.Box):
             self.set_hexpand(True)
             self.set_valign(Gtk.Align.CENTER)
             self.set_vexpand(False)
-
+        
         self.cache_threshold = 3 # Umbral para mantener vistas en caché
 
         self.month_views = {} # Reutilizado para vistas de semana también
 
         self.prev_button = Gtk.Button( # Nombre genérico del botón
-            name="prev-month-button",
+            name="prev-month-button", 
             child=Label(name="month-button-label", markup=icons.chevron_left) # CSS puede ser genérico
         )
         self.prev_button.connect("clicked", self.on_prev_clicked)
@@ -90,25 +90,30 @@ class Calendar(Gtk.Box):
         try:
             origin_date_str = subprocess.check_output(["locale", "week-1stday"], text=True).strip()
             first_weekday_val = int(subprocess.check_output(["locale", "first_weekday"], text=True).strip())
-
+            
             origin_date = datetime.fromisoformat(origin_date_str)
             # Esta lógica calcula el día de la semana (0-6, Lunes=0) que es considerado el primero
             # según la configuración regional combinada de week-1stday y first_weekday.
             date_of_first_day_of_week_config = origin_date + timedelta(days=first_weekday_val - 1)
             new_first_weekday = date_of_first_day_of_week_config.weekday() # Lunes=0, ..., Domingo=6
-
+            
             # Update the first_weekday on main thread and refresh calendar if needed
             GLib.idle_add(self._update_first_weekday, new_first_weekday)
         except Exception as e:
             print(f"Error getting locale first weekday: {e}")
             # Keep default value (0 = Monday)
-
+    
     def _update_first_weekday(self, new_first_weekday):
         """Update first weekday setting and refresh calendar if changed."""
         if self.first_weekday != new_first_weekday:
             self.first_weekday = new_first_weekday
             # Clear cache and refresh calendar with new locale settings
             self.month_views.clear()
+            # Remove all current stack children to force regeneration
+            for child in self.stack.get_children():
+                self.stack.remove(child)
+            # Update header (which includes weekday labels) and calendar
+            self.update_header()
             self.update_calendar()
         return False  # Don't repeat this idle callback
 
@@ -180,7 +185,7 @@ class Calendar(Gtk.Box):
 
         for child in self.weekday_row.get_children():
             self.weekday_row.remove(child)
-
+        
         day_initials = self.get_weekday_initials()
         for day_initial in day_initials:
             label = Gtk.Label(label=day_initial.upper(), name="weekday-label")
@@ -204,7 +209,7 @@ class Calendar(Gtk.Box):
             if new_key not in self.month_views:
                 # Pasar self.current_shown_date directamente a create_week_view
                 view_widget = self.create_week_view(self.current_shown_date)
-
+        
         if new_key is None: return
 
         if new_key > self.previous_key:
@@ -218,7 +223,7 @@ class Calendar(Gtk.Box):
         if view_widget: # Si se creó una nueva vista
             self.month_views[new_key] = view_widget
             self.stack.add_titled(view_widget, child_name, child_name)
-
+        
         self.stack.set_visible_child_name(child_name)
         # El encabezado se actualiza ANTES de llamar a update_calendar en __init__ y on_clicked,
         # y también en on_midnight si es necesario.
@@ -267,7 +272,7 @@ class Calendar(Gtk.Box):
                     day_date_obj = datetime(year, month, day_num)
                     if day_date_obj == self.current_day_date:
                         label.get_style_context().add_class("current-day")
-
+                
                 middle_box.pack_start(Gtk.Box(hexpand=True, vexpand=True), True, True, 0)
                 middle_box.pack_start(label, False, False, 0)
                 middle_box.pack_start(Gtk.Box(hexpand=True, vexpand=True), True, True, 0)
@@ -281,14 +286,14 @@ class Calendar(Gtk.Box):
 
     def create_week_view(self, first_day_of_week_to_display):
         grid = Gtk.Grid(column_homogeneous=True, row_homogeneous=False, name="calendar-grid-week-view") # Podría tener estilo diferente
-
+        
         # El mes de referencia para atenuar es el mes de first_day_of_week_to_display
         # que es self.current_shown_date, y su mes es self.current_month (actualizado en nav)
         reference_month_for_dimming = first_day_of_week_to_display.month
 
         for col in range(7):
             current_day_in_loop = first_day_of_week_to_display + timedelta(days=col)
-
+            
             day_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, name="day-box") # Reusar estilo de day-box
             top_spacer = Gtk.Box(hexpand=True, vexpand=True)
             middle_box = Gtk.Box(hexpand=True, vexpand=True)
@@ -298,7 +303,7 @@ class Calendar(Gtk.Box):
 
             if current_day_in_loop == self.current_day_date:
                 label.get_style_context().add_class("current-day")
-
+            
             if current_day_in_loop.month != reference_month_for_dimming:
                  label.get_style_context().add_class("dim-label") # Necesita CSS: .dim-label { opacity: 0.5; } o similar
 
@@ -309,9 +314,9 @@ class Calendar(Gtk.Box):
             day_box.pack_start(top_spacer, True, True, 0)
             day_box.pack_start(middle_box, True, True, 0)
             day_box.pack_start(bottom_spacer, True, True, 0)
-
+            
             grid.attach(day_box, col, 0, 1, 1) # Todos los días en la fila 0
-
+        
         # Para mantener una altura similar a la vista mensual, se podrían añadir filas vacías.
         # Esto es opcional y depende del diseño deseado.
         # for r_idx in range(1, 6): # Añadir 5 filas vacías
@@ -346,7 +351,7 @@ class Calendar(Gtk.Box):
             self.current_shown_date -= timedelta(days=7)
             self.current_year = self.current_shown_date.year # Actualizar para el header
             self.current_month = self.current_shown_date.month # Actualizar para el header y dimming
-
+        
         # self.update_header() # Se llama dentro de update_calendar
         self.update_calendar()
 

@@ -6,8 +6,7 @@ import threading
 import time
 from pathlib import Path
 
-import gi
-
+import gi 
 gi.require_version("Gtk", "3.0")
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
@@ -37,12 +36,11 @@ class HyprConfGUI(Window):
         super().__init__(
             title="Ax-Shell Settings",
             name="axshell-settings-window",
-            size=(640, 640),
             **kwargs,
         )
-
-        self.set_resizable(False)
-
+        
+        self.set_resizable(True)
+        self.set_size_request(640, 640)
         self.selected_face_icon = None
         self.show_lock_checkbox = show_lock_checkbox
         self.show_idle_checkbox = show_idle_checkbox
@@ -1136,39 +1134,10 @@ class HyprConfGUI(Window):
                     print(f"Warning: Source hypridle config not found at {src}")
                 print(f"{time.time():.4f}: Finished replacing hypridle config.")
 
-            print(
-                f"{time.time():.4f}: Checking/Appending hyprland.conf source string..."
-            )
-            hypr_path = os.path.expanduser("~/.config/hypr/hyprland.conf")
-            try:
-                from .settings_constants import SOURCE_STRING
-
-                needs_append = True
-                if os.path.exists(hypr_path):
-                    with open(hypr_path, "r") as f:
-                        if SOURCE_STRING.strip() in f.read():
-                            needs_append = False
-                else:
-                    os.makedirs(os.path.dirname(hypr_path), exist_ok=True)
-
-                if needs_append:
-                    with open(hypr_path, "a") as f:
-                        f.write("\n" + SOURCE_STRING)
-                    print(f"Appended source string to {hypr_path}")
-            except Exception as e:
-                print(f"Error updating {hypr_path}: {e}")
-            print(
-                f"{time.time():.4f}: Finished checking/appending hyprland.conf source string."
-            )
-
-            print(f"{time.time():.4f}: Running start_config()...")
-            start_config()
-            print(f"{time.time():.4f}: Finished start_config().")
-
             print(f"{time.time():.4f}: Initiating Ax-Shell restart using Popen...")
             main_py = os.path.expanduser(f"~/.config/{APP_NAME_CAP}/main.py")
             kill_cmd = f"killall {APP_NAME}"
-            start_cmd = ["uwsm", "app", "--", "python", main_py]
+            start_cmd = ["python", main_py]
             try:
                 kill_proc = subprocess.Popen(
                     kill_cmd,
