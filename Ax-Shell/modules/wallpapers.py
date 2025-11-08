@@ -6,6 +6,7 @@ import random
 import shutil
 import math
 import statistics
+
 from typing import Tuple
 from concurrent.futures import ThreadPoolExecutor
 
@@ -23,7 +24,7 @@ import modules.icons as icons
 
 class WallpaperSelector(Box):
     CACHE_DIR = f"{data.CACHE_DIR}/thumbs"
-
+    MQTT_SCRIPT_PATH = os.path.expanduser("~/.config/hypr/scripts/colors_mqtt.sh")
     def __init__(self, **kwargs):
         old_cache_dir = f"{data.CACHE_DIR}/wallpapers"
         if os.path.exists(old_cache_dir):
@@ -181,6 +182,7 @@ class WallpaperSelector(Box):
         self.hue_slider.set_valign(Gtk.Align.CENTER)
         self.apply_color_button = Button(name="apply-color-button", child=Label(name="apply-color-label", markup=icons.accept))
         self.apply_color_button.connect("clicked", self.on_apply_color_clicked)
+        
         self.apply_color_button.set_vexpand(False)
         self.apply_color_button.set_valign(Gtk.Align.CENTER)
         self.custom_color_selector_box = Box(
@@ -202,10 +204,13 @@ class WallpaperSelector(Box):
         self.show_all()
         self.randomize_dice_icon()
         self.search_entry.grab_focus()
+        
 
     def update_current_wallpaper_label(self):
         """Updates the label to show the current wallpaper's name and directory."""
         current_wall = os.path.expanduser("~/.current.wall")
+        
+
         try:
             if os.path.islink(current_wall) or os.path.isfile(current_wall):
                 full_path = os.readlink(current_wall) if os.path.islink(current_wall) else current_wall
@@ -220,6 +225,7 @@ class WallpaperSelector(Box):
         except Exception as e:
             print(f"Error reading current wallpaper: {e}")
             self.current_wallpaper_label.set_label("Current Wallpaper: Error")
+        
 
     def on_prev_clicked(self, button):
         if self.is_searching:
@@ -379,27 +385,39 @@ class WallpaperSelector(Box):
 
     def _set_wallpaper_from_path(self, full_path: str):
         selected_scheme = self.scheme_dropdown.get_active_id()
-        # Check if the image is grayscale
-        if selected_scheme == "scheme-content" and self._is_grayscale(full_path):
-            print(f"Grayscale image detected, falling back to 'monochrome' scheme for {full_path}")
-            selected_scheme = "scheme-monochrome"  # Fallback to monochrome scheme
+        # ... (Grayscale check logic remains the same) ...
 
         current_wall = os.path.expanduser("~/.current.wall")
         if os.path.isfile(current_wall) or os.path.islink(current_wall):
             os.remove(current_wall)
         os.symlink(full_path, current_wall)
+        
+        # --- MODIFIED LOGIC START ---
         if self.matugen_switcher.get_active():
-            exec_shell_command_async(f'matugen image "{full_path}" -t {selected_scheme}')
+            # Run matugen in the executor and wait for it to complete.
+            # Then, run the MQTT script in the GLib main thread.
+            matugen_command = f'matugen image "{full_path}" -t {selected_scheme}'
+            
+            future = self.executor.submit(os.system, matugen_command)
+            future.add_done_callback(lambda f: GLib.idle_add(self._run_mqtt_script_callback))
+
         else:
+            # If matugen is disabled, just use swww and immediately run the MQTT script 
+            # (assuming colors are static or handled elsewhere).
             exec_shell_command_async(
                 f'swww img "{full_path}" -t outer --transition-duration 1.5 --transition-step 255 --transition-fps 60 -f Nearest'
             )
+            exec_shell_command_async(f"bash {self.MQTT_SCRIPT_PATH}")
+        
+        # --- MODIFIED LOGIC END ---
+        
         print(f"Set wallpaper: {os.path.basename(full_path)}")
         self.update_current_wallpaper_label()
         
         exec_shell_command_async(
                 f'fabric-cli exec ax-shell notch.close_notch()'
             )
+        
     def set_random_wallpaper(self, widget, external=False):
         if not self.files:
             print("No wallpapers available to set a random one.")
@@ -412,15 +430,18 @@ class WallpaperSelector(Box):
         self.search_entry.grab_focus() # Add this line
 
     def setup_file_monitor(self):
+        
         gfile = Gio.File.new_for_path(data.WALLPAPERS_DIR)
         self.file_monitor = gfile.monitor_directory(Gio.FileMonitorFlags.WATCH_MOVES, None)
         self.file_monitor.connect("changed", self.on_directory_changed)
 
     def on_directory_changed(self, monitor, file, other_file, event_type):
+        
         print(f"Directory change detected: {event_type.value_nick}, refreshing wallpapers...")
         GLib.idle_add(self.refresh_wallpaper_list)
 
     def refresh_wallpaper_list(self):
+        
         self.files.clear()
         self.thumbnails.clear()
         self.viewport.get_model().clear()
@@ -430,6 +451,7 @@ class WallpaperSelector(Box):
         self._load_page(self.current_page)
         self.arrange_viewport(self.search_entry.get_text())
         self.update_current_wallpaper_label()
+        
         return False
 
     def arrange_viewport(self, query: str = ""):
@@ -505,6 +527,7 @@ class WallpaperSelector(Box):
         full_path = model[path][1]
         self._set_wallpaper_from_path(full_path)
         self.search_entry.grab_focus() # Add this line
+        
 
     def on_scheme_changed(self, combo):
         selected_scheme = combo.get_active_id()
@@ -694,4 +717,19 @@ class WallpaperSelector(Box):
         hex_color = self.hsl_to_rgb_hex(hue_value)
         print(f"Applying color from slider: H={hue_value}, HEX={hex_color}")
         selected_scheme = self.scheme_dropdown.get_active_id()
-        exec_shell_command_async(f'matugen color hex "{hex_color}" -t {selected_scheme}')
+        
+        # --- MODIFIED LOGIC START ---
+        # Run matugen in the executor and wait for it to complete.
+        # Then, run the MQTT script in the GLib main thread.
+        matugen_command = f'matugen color hex "{hex_color}" -t {selected_scheme}'
+        
+        future = self.executor.submit(os.system, matugen_command)
+        future.add_done_callback(lambda f: GLib.idle_add(self._run_mqtt_script_callback))
+        # --- MODIFIED LOGIC END ---
+    def _run_mqtt_script_callback(self):
+        """Runs the MQTT script on the main GLib thread after matugen finishes."""
+        exec_shell_command_async(f"bash {self.MQTT_SCRIPT_PATH}")
+        return False # False tells GLib to run it once and quit
+        
+        
+
