@@ -19,7 +19,16 @@ R=$((16#${PRIMARY_HEX:0:2}))
 G=$((16#${PRIMARY_HEX:2:2}))
 B=$((16#${PRIMARY_HEX:4:2}))
 
+# Adjust color balance (reduce green/blue)
+G=$(printf "%.0f" "$(echo "$G * 0.8" | bc -l)")
+B=$(printf "%.0f" "$(echo "$B * 0.8" | bc -l)")
+
+# Ensure RGB values are within 0–255
+R=$((R < 0 ? 0 : (R > 255 ? 255 : R)))
+G=$((G < 0 ? 0 : (G > 255 ? 255 : G)))
+B=$((B < 0 ? 0 : (B > 255 ? 255 : B)))
+
 # Publish as JSON-like list
 mosquitto_pub -h "$BROKER" -t "$TOPIC" -m "[$R,$G,$B]"
 
-echo "✅ Sent primary color as [$R,$G,$B] to MQTT topic '$TOPIC'"
+echo "✅ Sent adjusted color as [$R,$G,$B] to MQTT topic '$TOPIC'"
