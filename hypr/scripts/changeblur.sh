@@ -8,8 +8,8 @@ STATE=$(hyprctl -j getoption decoration:blur:enabled | jq ".int")
 
 if [ "${STATE}" == "1" ]; then
   hyprctl keyword decoration:blur:enabled 0
-  notify-send -e -u low -i "$notif" "No blur"
+  notify-send -e -u critical -i "$notif" "No blur"
 else
   hyprctl keyword decoration:blur:enabled 1
-  notify-send -e -u low -i "$notif" "Normal blur"
+  notify-send -e -u critical -i "$notif" "Normal blur"
 fi
