@@ -402,10 +402,10 @@ class WallpaperSelector(Box):
             future.add_done_callback(lambda f: GLib.idle_add(self._run_mqtt_script_callback))
 
         else:
-            # If matugen is disabled, just use swww and immediately run the MQTT script 
+            # If matugen is disabled, just use awww and immediately run the MQTT script 
             # (assuming colors are static or handled elsewhere).
             exec_shell_command_async(
-                f'swww img "{full_path}" -t outer --transition-duration 1.5 --transition-step 255 --transition-fps 60 -f Nearest'
+                f'awww img "{full_path}" -t outer --transition-duration 1.5 --transition-step 255 --transition-fps 60 -f Nearest'
             )
             exec_shell_command_async(f"bash {self.MQTT_SCRIPT_PATH}")
         
