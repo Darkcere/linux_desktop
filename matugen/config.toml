@@ -5,16 +5,25 @@ reload_apps = true
 command = "awww"
 arguments = [ "img", "-t", "fade", "--transition-duration", "0.5", "--transition-step", "255", "--transition-fps", "60", "-f", "Nearest",]
 set = true
-
+post_hook = "ln -s \"$MATUGEN_WALLPAPER\" ~/.current.wall"
 [templates.hyprland]
 input_path = "~/.config/Ax-Shell/config/matugen/templates/hyprland-colors.conf"
 output_path = "~/.config/Ax-Shell/config/hypr/colors.conf"
-
-[templates.ax-shell]
-input_path = "~/.config/Ax-Shell/config/matugen/templates/ax-shell.css"
-output_path = "~/.config/Ax-Shell/styles/colors.css"
-post_hook = "fabric-cli exec ax-shell 'app.set_css()' &"
-
+[templates.waybar]                                                                                                                                                             
+input_path = "~/.config/Ax-Shell/config/matugen/templates/waybar.css"                                                                                                            
+output_path = "~/.config/waybar/style.css"
+#[templates.ax-shell]
+#input_path = "~/.config/Ax-Shell/config/matugen/templates/ax-shell.css"
+#output_path = "~/.config/Ax-Shell/styles/colors.css"
+#post_hook = "fabric-cli exec ax-shell 'app.set_css()' &"
+[templates.vicinae]
+input_path = './templates/vicinae.toml'
+output_path = '~/.local/share/vicinae/themes/matugen.toml'
+post_hook = 'vicinae theme set matugen'
+[templates.swaync]                                                                                                                                                             
+input_path = "~/.config/Ax-Shell/config/matugen/templates/swaync.css"                                                                                                            
+output_path = "~/.config/swaync/style.css"
+post_hook = 'swaync-client -rs'
 [config.custom_colors.red]
 color = "#FF0000"
 blend = true

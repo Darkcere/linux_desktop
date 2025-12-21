@@ -8,6 +8,4 @@ if [[ -n "$ocr_text" ]]; then
     # Copia el texto reconocido al portapapeles
     echo -n "$ocr_text" | wl-copy
     notify-send -a "Ax-Shell" "OCR Success" "Text Copied to Clipboard"
-else
-    notify-send -a "Ax-Shell" "OCR Failed" "No text recognized or operation failed"
 fi

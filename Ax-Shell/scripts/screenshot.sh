@@ -43,13 +43,12 @@ if [ -f "$full_path" ]; then
    \
 
     ACTION=$(notify-send -a "Ax-Shell" -i "$full_path" "Screenshot saved" "in $full_path" \
-        -A "view=View" -A "edit=Edit" -A "open=Open Folder")
+        -A "view=View" -A "edit=Edit" -A "open=Open Folder" -A "delete=Delete")\
 
     case "$ACTION" in
         view) xdg-open "$full_path" ;;
         edit) swappy -f "$full_path" ;;
         open) xdg-open "$save_dir" ;;
+        delete) rm -r "$full_path" ;;
     esac
-else
-    notify-send -a "Ax-Shell" "Screenshot Aborted"
 fi
