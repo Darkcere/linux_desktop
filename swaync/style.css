@@ -1,12 +1,12 @@
 /* Updated CSS with defined colors applied */
 
-@define-color foreground #e0e3e5;
-@define-color background #101416;
-@define-color primary #83d1f1;
-@define-color secondary #aecbd9;
-@define-color surface #101416;
-@define-color outline #33383a;
-@define-color on-primary #000000;
+@define-color foreground #e4e2e3;
+@define-color background #131314;
+@define-color primary #bac8d9;
+@define-color secondary #c2c7ce;
+@define-color surface #131314;
+@define-color outline #37383b;
+@define-color on-primary #090c0f;
 /* Main background now uses @primary */
 /* removed noti-bg */
 @define-color red #ffb2b9;
