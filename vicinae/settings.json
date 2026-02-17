@@ -21,17 +21,21 @@
       }
    },
    "launcher_window": {
-      "opacity": 0.95
+      "opacity": 0.9
    },
    "favorites": [],
    "providers": {
       "applications": {
          "preferences": {
+            "defaultAction": "launch",
             "paths": [
                "/home/duarte/.local/share/applications",
                "/usr/share/applications"
             ]
          }
+      },
+      "browser-extension": {
+         "enabled": false
       },
       "calculator": {
          "enabled": false

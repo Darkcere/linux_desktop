@@ -71,7 +71,7 @@ toggle_mic() {
   if [ "$(pamixer --default-source --get-mute)" == "false" ]; then
     pamixer --default-source -m && notify-send -t 1000000000 -e -u critical -i "$iDIR/microphone-mute.png" "Microphone Switched OFF" && paplay /usr/share/sounds/ocean/stereo/outcome-failure.oga
   elif [ "$(pamixer --default-source --get-mute)" == "true" ]; then
-    pamixer -u --default-source u && swaync-client --close-all && notify-send -t 1000 -e -u critical -i "$iDIR/microphone.png" "Microphone Switched ON" && paplay /usr/share/sounds/ocean/stereo/outcome-success.oga
+    pamixer -u --default-source u && notify-send -t 1000 -e -u critical -i "$iDIR/microphone.png" "Microphone Switched ON" && paplay /usr/share/sounds/ocean/stereo/outcome-success.oga && swaync-client --close-all
   fi
 }
 # Get Mic Icon

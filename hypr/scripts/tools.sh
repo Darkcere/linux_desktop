@@ -142,7 +142,7 @@ build_menu() {
   cat <<-EOF
 Screenshot
 Open Screenshots Folder
-Statuscreen Recorder $status_screenrecord
+Recorder $status_screenrecord
 Open Recordings Folder
 OCR
 Color Picker
