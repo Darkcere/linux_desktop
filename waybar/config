@@ -10,7 +10,7 @@
     "font-family": "JetBrainsMono Nerd Font, monospace",
     
     "modules-left": ["custom/arch-logo","hyprland/workspaces"],
-    "modules-center": ["clock","custom/cava_mviz"],
+    "modules-center": ["clock","custom/cava_mviz","idle_inhibitor"],
     "modules-right": ["pulseaudio#microphone","group/audio","custom/swaync","tray"],
     
 
@@ -47,6 +47,7 @@
     },
 
 "clock": {
+  "interval": 1,
 	"format": "{:%H:%M}",
 	"format-alt": "{:%a, %b %d, %Y (%H:%M:%S)}",
 	"tooltip-format": "<tt><small>{calendar}</small></tt>",
@@ -129,5 +130,12 @@
     "min": 0,
     "max": 100,
     "orientation": "horizontal"
+},
+"idle_inhibitor": {
+	"format": "{icon}",
+	"format-icons": {
+		"activated": "",
+		"deactivated": ""
+	},
 },
 }

@@ -64,6 +64,12 @@
       "raycast-compat": {
          "enabled": false
       },
+      "scripts": {
+         "enabled": false
+      },
+      "shortcuts": {
+         "enabled": false
+      },
       "system": {
          "enabled": false
       },
