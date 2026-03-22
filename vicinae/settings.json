@@ -11,14 +11,22 @@
 {
    "$schema": "https://vicinae.com/schemas/config.json",
    "close_on_focus_loss": false,
-   "consider_preedit": false,
+   "consider_preedit": true,
    "pop_to_root_on_close": true,
+   "activate_on_single_click": true,
    "search_files_in_root": false,
+   "font": {
+      "rendering": "native",
+      "normal": {}
+   },
    "theme": {
       "dark": {
          "name": "matugen",
          "icon_theme": "Default"
       }
+   },
+   "telemetry": {
+      "system_info": false
    },
    "launcher_window": {
       "opacity": 0.9
@@ -44,7 +52,12 @@
          "enabled": false
       },
       "core": {
-         "enabled": false
+         "enabled": false,
+         "entrypoints": {
+            "search-emojis": {
+               "enabled": true
+            }
+         }
       },
       "developer": {
          "enabled": false
