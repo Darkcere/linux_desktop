@@ -11,18 +11,18 @@
 }
 
 #waybar {
-  color: #94cdf6;
-  background-color: #111416;
+  color: #c7bfff;
+  background-color: #141317;
   border-radius: 5px;
-  border: 2px solid #94cdf6;
+  border: 2px solid #c7bfff;
 }
 #workspaces button {
-  color: #0079b3;
+  color: #5348a5;
   padding-left: 0.4em;
 }
 
 #workspaces button.empty {
-  color:#94cdf6;
+  color:#c7bfff;
 }
 
 #memory,
@@ -43,9 +43,9 @@
   margin-top: 0.2em;
   margin-bottom: 0.2em;
   margin-right: 0.5em;
-  background-color: #00689a;
+  background-color: #4a4093;
   border-radius: 10px;
-  border: 2px solid #94cdf6;
+  border: 2px solid #c7bfff;
 }
 
 #window {
@@ -69,10 +69,10 @@
     min-height: 10px;
     min-width: 100px;
     border-radius: 5px;
-    background-color: #00689a;
+    background-color: #4a4093;
 }
 #pulseaudio-slider highlight {
     min-width: 10px;
     border-radius: 5px;
-    background-color: #94cdf6;
+    background-color: #c7bfff;
 }

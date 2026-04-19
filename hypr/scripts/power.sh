@@ -1,12 +1,12 @@
 #!/bin/bash
 
-OPTIONS="\uf186  Suspend System\n\
-\uf011  Power Off System\n\
-\uf021  Reboot System\n\
-\uf023  Lock Session\n\
-\uf08b  Log Out"
+OPTIONS="\uf186 Suspend System\n\
+\uf011 Power Off System\n\
+\uf021 Reboot System\n\
+\uf023 Lock Session\n\
+\uf08b Log Out"
 
-CHOICE=$(echo -e "$OPTIONS" | vicinae dmenu -p 'Power Menu:' | cut -d ' ' -f3-)
+CHOICE=$(echo -e "$OPTIONS" | vicinae dmenu -p 'Power Menu:' | cut -d ' ' -f2-)
 
 # --- Execute the selected command ---
 case "$CHOICE" in

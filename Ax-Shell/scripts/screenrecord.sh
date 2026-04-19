@@ -14,13 +14,13 @@ if pgrep -f "gpu-screen-recorder" >/dev/null; then
   pkill -SIGINT -f "gpu-screen-recorder"
 
   # Espera un momento para asegurarse de que la grabación se haya detenido y el archivo esté listo
-  sleep 1
+  sleep 0.2
 
   # Obtiene el último archivo grabado
   LAST_VIDEO=$(ls -t "$SAVE_DIR"/*.mp4 2>/dev/null | head -n 1)
 
   # Notificación con acciones: "View" abre el archivo, "Open folder" abre la carpeta
-  ACTION=$(notify-send -u critical -a "Ax-Shell" "⬜ Recording stopped" \
+  ACTION=$(notify-send -u critical -a "Ax-Shell" "🎬 Recording stopped" \
     -A "view=View" -A "open=Open folder")
 
   if [ "$ACTION" = "view" ] && [ -n "$LAST_VIDEO" ]; then

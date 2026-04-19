@@ -96,13 +96,6 @@ do_colorpicker() {
   bash "/home/duarte/.config/Ax-Shell/scripts/hyprpicker.sh" "$cmd"
 }
 
-# Emoji Picker (direct action)
-do_emoji() {
-  close_menu # Close the parent menu before launching the new vicinae command
-  # The vicinae command to open the picker is executed directly
-  bash -c "vicinae vicinae://extensions/vicinae/vicinae/search-emojis"
-}
-
 # Open Screenshots Folder (direct action)
 open_screenshots_folder() {
   close_menu # Close the parent menu
@@ -148,7 +141,6 @@ OCR
 Color Picker
 Game Mode $status_gamemode
 Pomodoro $status_pomodoro
-Emoji Picker
 EOF
 }
 # Run the main menu and execute the selected action
@@ -161,13 +153,12 @@ main() {
   case "$choice" in
   *"Screenshot") do_screenshot ;;
   *"Open Screenshots Folder") open_screenshots_folder ;;
-  *"Screen Recorder"*) do_screenrecord ;;
+  *"Recorder"*) do_screenrecord ;;
   *"Open Recordings Folder") open_recordings_folder ;;
   *"OCR") do_ocr ;;
   *"Color Picker") do_colorpicker ;;
   *"Game Mode"*) do_gamemode ;;
   *"Pomodoro"*) do_pomodoro ;;
-  *"Emoji Picker") do_emoji ;;
   *)
     # No selection or C-g escape
     exit 0
