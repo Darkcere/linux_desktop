@@ -23,7 +23,9 @@ post_hook = 'vicinae theme set matugen'
 input_path = "~/.config/Ax-Shell/config/matugen/templates/swaync.css"                                                                                                            
 output_path = "~/.config/swaync/style.css"
 post_hook = 'swaync-client -rs'
-
+[templates.fish]
+input_path = "./templates/fish.txt"
+output_path = "/home/duarte/.local/state/caelestia/sequences.txt"
 
 [config.custom_colors.red]
 color = "#FF0000"

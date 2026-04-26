@@ -63,7 +63,13 @@
          "enabled": false
       },
       "files": {
-         "enabled": false
+         "enabled": false,
+         "preferences": {
+            "autoIndexing": true,
+            "excludedPaths": "",
+            "paths": "/home/duarte",
+            "watcherPaths": ""
+         }
       },
       "font": {
          "enabled": false

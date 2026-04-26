@@ -8,31 +8,34 @@
     "spacing": 3,
     "reload_style_on_change": true,
     "font-family": "JetBrainsMono Nerd Font, monospace",
-    
+
     "modules-left": ["custom/arch-logo","hyprland/workspaces"],
     "modules-center": ["clock","custom/cava_mviz","idle_inhibitor"],
     "modules-right": ["pulseaudio#microphone","group/audio","custom/swaync","tray"],
-    
 
     "custom/arch-logo": {
         "format": "󰣇",
         "on-click": "vicinae toggle",
-        "tooltip":false
+        "tooltip": true,
+	"tooltip-format": "Open Launcher"
     },
-  "group/audio": {
-    "orientation": "horizontal",
-  "drawer": {
-		"transition-duration": 500
-	},
-  "modules": [
-		"wireplumber",
-		"pulseaudio/slider"
-	]
-},  
-    
+
+    "group/audio": {
+        "orientation": "horizontal",
+        "tooltip": false,
+        "drawer": {
+            "transition-duration": 500
+        },
+        "modules": [
+            "wireplumber",
+            "pulseaudio/slider"
+        ]
+    },
+
     "hyprland/workspaces": {
-        "format": "{icon}",  
+        "format": "{icon}",
         "on-click": "activate",
+        "tooltip": false,
         "format-icons": {
             "active": " ",
             "default": " "
@@ -46,97 +49,110 @@
         }
     },
 
-"clock": {
-  "interval": 1,
-  "tooltip": true,
-	"format": "{:%H:%M}",
-	"format-alt": "{:%a, %b %d, %Y (%H:%M:%S)}",
-	"tooltip-format": "<tt><small>{calendar}</small></tt>",
-	"calendar": {
-		"mode"          : "month",
-		"mode-mon-col"  : 3,
-		"weeks-pos"     : "right",
-		"on-scroll"     : 1,
-		"on-click-right": "mode",
-		"format": {
-			"months":     "<span color='#ffead3'><b>{}</b></span>",
-			"days":       "<span color='#ecc6d9'><b>{}</b></span>",
-			"weeks":      "<span color='#99ffdd'><b>W{}</b></span>",
-			"weekdays":   "<span color='#ffcc66'><b>{}</b></span>",
-			"today":      "<span color='#ff6699'><b><u>{}</u></b></span>"
-		}
-	},
-	"actions": {
-		"on-click-right": "mode",
-		"on-click-forward": "tz_up",
-		"on-click-backward": "tz_down",
-		"on-scroll-up": "shift_down",
-		"on-scroll-down": "shift_up"
-	}
-},
+    "clock": {
+        "interval": 1,
+        "tooltip": true,
+        "format": " {:%H:%M}",
+        "format-alt": "{:%a, %b %d, %Y (%H:%M:%S)}",
+        "tooltip-format": "<tt><small>{calendar}</small></tt>",
+        "calendar": {
+            "mode": "month",
+            "mode-mon-col": 3,
+            "weeks-pos": "right",
+            "on-scroll": 1,
+            "on-click-right": "mode",
+            "format": {
+                "months": "<span color='#ffead3'><b>{}</b></span>",
+                "days": "<span color='#ecc6d9'><b>{}</b></span>",
+                "weeks": "<span color='#99ffdd'><b>W{}</b></span>",
+                "weekdays": "<span color='#ffcc66'><b>{}</b></span>",
+                "today": "<span color='#ff6699'><b><u>{}</u></b></span>"
+            }
+        },
+        "actions": {
+            "on-click-right": "mode",
+            "on-click-forward": "tz_up",
+            "on-click-backward": "tz_down",
+            "on-scroll-up": "shift_down",
+            "on-scroll-down": "shift_up"
+        }
+    },
+
     "wireplumber": {
         "format": "󰕾 {volume}%",
         "format-muted": "󰖁",
         "max-volume": 100,
         "scroll-step": 5,
         "on-click-right": "pwvucontrol",
-        "on-click": "pamixer -t"
+        "on-click": "pamixer -t",
+        "tooltip": true,
+        "tooltip-format": "Volume: {volume}%"
     },
 
     "tray": {
         "icon-size": 18,
         "spacing": 5,
+        "tooltip": false,
         "ignored-icons": [
-        "waybar"        // Sometimes Waybar registers itself
-    ]
+            "waybar"
+        ]
     },
+
     "pulseaudio#microphone": {
-	"format": "{format_source}",
-	"format-source": "",
-	"format-source-muted": "",
-	"on-click": "pamixer --default-source -t",
-	"on-click-right": "pwvucontrol -t 3",
-	"tooltip-format": "{source_desc} | {source_volume}%",
-	"scroll-step": 5,
-},
-"custom/swaync": {
-	"tooltip": true,
-	"tooltip-format": "Left Click: Launch Notification Center\nRight Click: Do not Disturb",
-	"format": "{icon}",
-	"format-icons": {
-		"notification": "<span foreground='red'><sup></sup></span>",
-		"none": "",
-		"dnd-notification": "<span foreground='red'><sup></sup></span>",
-		"dnd-none": "",
-		"inhibited-notification": "<span foreground='red'><sup></sup></span>",
-		"inhibited-none": "",
-		"dnd-inhibited-notification": "<span foreground='red'><sup></sup></span>",
-		"dnd-inhibited-none": ""
-	},
-	"return-type": "json",
-	"exec-if": "which swaync-client",
-	"exec": "swaync-client -swb",
-	"on-click": "sleep 0.1 && swaync-client -t -sw",
-	"on-click-right": "swaync-client -d -sw",
-	"escape": true,
-},
-"custom/cava_mviz": {
-	"exec": "~/.config/hypr/scripts/WaybarCava.sh",
-	"format": "{}",
-  "on-click": "playerctl play-pause",
-  "on-click-right": "playerctl next",
-  "on-click-middle": "playerctl previous"
-},
-"pulseaudio/slider": {
-    "min": 0,
-    "max": 100,
-    "orientation": "horizontal"
-},
-"idle_inhibitor": {
-	"format": "{icon}",
-	"format-icons": {
-		"activated": "",
-		"deactivated": ""
-	},
-},
+        "format": "{format_source}",
+        "format-source": "",
+        "format-source-muted": "",
+        "on-click": "pamixer --default-source -t",
+        "on-click-right": "pwvucontrol -t 3",
+        "tooltip": true,
+        "tooltip-format": "{source_desc} | {source_volume}%",
+        "scroll-step": 5
+    },
+
+    "custom/swaync": {
+        "tooltip": true,
+        "tooltip-format": "Left Click: Notifications\nRight Click: Do Not Disturb",
+        "format": "{icon}",
+        "format-icons": {
+            "notification": "<span foreground='red'><sup></sup></span>",
+            "none": "",
+            "dnd-notification": "<span foreground='red'><sup></sup></span>",
+            "dnd-none": "",
+            "inhibited-notification": "<span foreground='red'><sup></sup></span>",
+            "inhibited-none": "",
+            "dnd-inhibited-notification": "<span foreground='red'><sup></sup></span>",
+            "dnd-inhibited-none": ""
+        },
+        "return-type": "json",
+        "exec-if": "which swaync-client",
+        "exec": "swaync-client -swb",
+        "on-click": "sleep 0.1 && swaync-client -t -sw",
+        "on-click-right": "swaync-client -d -sw",
+        "escape": true
+    },
+
+    "custom/cava_mviz": {
+        "exec": "~/.config/hypr/scripts/WaybarCava.sh",
+        "format": "{}",
+        "tooltip": false,
+        "on-click": "playerctl play-pause",
+        "on-click-right": "playerctl next",
+        "on-click-middle": "playerctl previous"
+    },
+
+    "pulseaudio/slider": {
+        "min": 0,
+        "max": 100,
+        "orientation": "horizontal"
+    },
+
+    "idle_inhibitor": {
+        "format": "{icon}",
+        "tooltip": true,
+        "tooltip-format": "Idle Inhibitor",
+        "format-icons": {
+            "activated": "",
+            "deactivated": ""
+        }
+    }
 }

@@ -6,8 +6,7 @@ alias debian="ssh server@192.168.1.247"
 if status is-interactive
     set -g fish_greeting ""
     # Custom colours
-    cat ~/.local/state/caelestia/sequences.txt 2>/dev/null
-
+    source ~/.local/state/caelestia/sequences.txt
     # For jumping between prompts in foot terminal
     #function mark_prompt_start --on-event fish_prompt
     echo -en "\e]133;A\e\\"
