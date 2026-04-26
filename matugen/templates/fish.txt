@@ -1,0 +1,21 @@
+printf '"\e]11;#0d0d11\e\\"'
+printf '"\e]10;{{colors.on_background.default.hex}}\e\\"'
+printf '"\e]12;{{colors.primary.default.hex}}\e\\"'
+
+# Base ANSI colors mapped to Material roles
+printf '"\e]4;0;{{colors.background.default.hex}}\e\\"'
+printf '"\e]4;1;{{colors.error.default.hex}}\e\\"'
+printf '"\e]4;2;{{colors.tertiary.default.hex}}\e\\"'
+printf '"\e]4;3;{{colors.secondary.default.hex}}\e\\"'
+printf '"\e]4;4;{{colors.primary.default.hex}}\e\\"'
+printf '"\e]4;5;{{colors.tertiary.default.hex}}\e\\"'
+printf '"\e]4;6;{{colors.secondary.default.hex}}\e\\"'
+printf '"\e]4;7;{{colors.on_background.default.hex}}\e\\"'
+
+printf '"\e]4;9;{{colors.error.default.hex | lighten: 10.0}}\e\\"'
+printf '"\e]4;10;{{colors.tertiary.default.hex | lighten: 10.0}}\e\\"'
+printf '"\e]4;11;{{colors.secondary.default.hex | lighten: 10.0}}\e\\"'
+printf '"\e]4;12;{{colors.primary.default.hex | lighten: 10.0}}\e\\"'
+printf '"\e]4;13;{{colors.tertiary.default.hex | lighten: 10.0}}\e\\"'
+printf '"\e]4;14;{{colors.secondary.default.hex | lighten: 10.0}}\e\\"'
+printf '"\e]4;15;{{colors.surface.default.hex | lighten: 20.0}}\e\\"'
