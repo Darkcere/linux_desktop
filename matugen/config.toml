@@ -11,10 +11,6 @@ output_path = "~/.config/Ax-Shell/config/hypr/colors.conf"
 [templates.waybar]                                                                                                                                                             
 input_path = "~/.config/Ax-Shell/config/matugen/templates/waybar.css"                                                                                                            
 output_path = "~/.config/waybar/style.css"
-#[templates.ax-shell]
-#input_path = "~/.config/Ax-Shell/config/matugen/templates/ax-shell.css"
-#output_path = "~/.config/Ax-Shell/styles/colors.css"
-#post_hook = "fabric-cli exec ax-shell 'app.set_css()' &"
 [templates.vicinae]
 input_path = './templates/vicinae.toml'
 output_path = '~/.local/share/vicinae/themes/matugen.toml'
@@ -29,7 +25,13 @@ output_path = "/home/duarte/.local/state/caelestia/sequences.txt"
 [templates.qt6ct]
 input_path = "./templates/qt6ct.conf"
 output_path = "/home/duarte/.config/qt6ct/colors/matugen.conf"
-
+#Delete the gtk3 and gtk4 config files for this to work 
+[templates.gtk4]
+input_path = "./templates/gtk.css"
+output_path = "/home/duarte/.config/gtk-4.0/gtk.css"
+[templates.gtk3]
+input_path = "./templates/gtk.css"
+output_path = "/home/duarte/.config/gtk-3.0/gtk.css"
 
 
 [config.custom_colors.red]
