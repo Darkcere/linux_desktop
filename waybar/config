@@ -106,7 +106,8 @@
         "on-click-right": "pwvucontrol -t 3",
         "tooltip": true,
         "tooltip-format": "{source_desc} | {source_volume}%",
-        "scroll-step": 5
+        "on-scroll-up": "pamixer --default-source -i 5",
+        "on-scroll-down": "pamixer --default-source -d 5"
     },
 
     "custom/swaync": {

@@ -26,6 +26,11 @@ post_hook = 'swaync-client -rs'
 [templates.fish]
 input_path = "./templates/fish.txt"
 output_path = "/home/duarte/.local/state/caelestia/sequences.txt"
+[templates.qt6ct]
+input_path = "./templates/qt6ct.conf"
+output_path = "/home/duarte/.config/qt6ct/colors/matugen.conf"
+
+
 
 [config.custom_colors.red]
 color = "#FF0000"
