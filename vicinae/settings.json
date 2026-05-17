@@ -40,7 +40,8 @@
             "paths": [
                "/home/duarte/.local/share/applications",
                "/usr/share/applications"
-            ]
+            ],
+            "launchPrefix": ""
          }
       },
       "browser-extension": {

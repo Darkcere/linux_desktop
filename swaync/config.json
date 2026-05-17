@@ -28,6 +28,12 @@
   "hide-on-clear": false,
   "hide-on-action": true,
   "script-fail-notify": true,
+  "scripts": {
+    "go-to-workspace": {
+      "exec": "hyprctl dispatch focuswindow \"class:$SWAYNC_APP_NAME\"",
+      "run-on": "action"
+    }
+  },
   "widgets": [
     "dnd",
     "mpris",
@@ -49,7 +55,8 @@
       "text": "Notification"
     },
     "mpris": {
-      "image-size": 10,
+      "autohide": true,
+      "image-size": 50,
       "image-radius": 0,
       "blacklist": [
         "playerctl"

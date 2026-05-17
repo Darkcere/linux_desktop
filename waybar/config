@@ -36,6 +36,8 @@
         "format": "{icon}",
         "on-click": "activate",
         "tooltip": false,
+        "on-scroll-down": "hyprctl dispatch workspace +1",
+        "on-scroll-up": "hyprctl dispatch workspace -1",
         "format-icons": {
             "active": " ",
             "default": " "

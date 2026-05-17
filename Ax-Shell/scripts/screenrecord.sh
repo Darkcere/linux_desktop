@@ -21,12 +21,14 @@ if pgrep -f "gpu-screen-recorder" >/dev/null; then
 
   # Notificación con acciones: "View" abre el archivo, "Open folder" abre la carpeta
   ACTION=$(notify-send -u critical -a "Ax-Shell" "🎬 Recording stopped" \
-    -A "view=View" -A "open=Open folder")
+    -A "view=View" -A "open=Open folder" -A "delete=Delete")
 
   if [ "$ACTION" = "view" ] && [ -n "$LAST_VIDEO" ]; then
     xdg-open "$LAST_VIDEO"
   elif [ "$ACTION" = "open" ]; then
     xdg-open "$SAVE_DIR"
+  elif [ "$ACTION" = "delete" ]; then
+    rm -r "$LAST_VIDEO"
   fi
   exit 0
 fi

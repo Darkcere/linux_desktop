@@ -16,11 +16,11 @@ case "$CHOICE" in
   ;;
 "Power Off System")
   echo "Shutting down system..."
-  systemctl poweroff
+  hyprshutdown -t 'Shutting down...' --post-cmd 'shutdown -P 0'
   ;;
 "Reboot System")
   echo "Rebooting system..."
-  systemctl reboot
+  hyprshutdown -t 'Restarting...' --post-cmd 'reboot'
   ;;
 "Lock Session")
   echo "Locking session..."
@@ -32,7 +32,7 @@ case "$CHOICE" in
   echo "Logging out..."
   # Replace 'pkill -KILL -u "$USER"' with the proper logout command for your WM/DE.
   # e.g., 'loginctl terminate-session $XDG_SESSION_ID' for SystemD-based logouts.
-  pkill -KILL -u "$USER"
+  hyprshutdown -t 'Logging out...'
   ;;
 *)
   echo "Menu closed or no action selected: $CHOICE"

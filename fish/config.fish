@@ -1,6 +1,5 @@
 alias windows="sudo umount /mnt/window && sudo ntfs-3g -o remove_hiberfile /dev/nvme0n1p3 /mnt/window/"
 alias vencord='sh -c "$(curl -sS https://raw.githubusercontent.com/Vendicated/VencordInstaller/main/install.sh)"'
-alias revicinae="kill vicinae-server && hyprctl dispatch exec vicinae server"
 alias rpi="ssh server@192.168.1.246"
 alias debian="ssh server@192.168.1.247"
 if status is-interactive

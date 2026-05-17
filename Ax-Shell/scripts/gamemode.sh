@@ -20,14 +20,16 @@ toggle_gamemode() {
             keyword animations:enabled 0;\
             keyword decoration:shadow:enabled 0;\
             keyword decoration:blur:enabled 0;\
-            keyword general:gaps_in 0;\
-            keyword general:gaps_out 0;\
             keyword general:border_size 1;\
             keyword decoration:rounding 0;\
             keyword misc:vfr 1"\ 
+        swaync-client -dn
+        powerprofilesctl set performance
         exit
     fi
     hyprctl reload
+    swaync-client -df
+    powerprofilesctl set balanced
 }
 
 # Main script logic

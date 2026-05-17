@@ -133,13 +133,13 @@ build_menu() {
 
   # Format: Tool Name | Status
   cat <<-EOF
+Game Mode $status_gamemode
 Screenshot
 Open Screenshots Folder
 Recorder $status_screenrecord
 Open Recordings Folder
 OCR
 Color Picker
-Game Mode $status_gamemode
 Pomodoro $status_pomodoro
 EOF
 }
