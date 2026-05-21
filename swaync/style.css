@@ -6,7 +6,7 @@
 @define-color secondary #ccc5be;
 @define-color surface #141312;
 @define-color outline #383631;
-@define-color on-primary #070705;
+@define-color on-primary #060604;
 /* Main background now uses @primary */
 /* removed noti-bg */
 @define-color red #ffb595;

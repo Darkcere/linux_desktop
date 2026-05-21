@@ -91,6 +91,9 @@
       "shortcuts": {
          "enabled": false
       },
+      "snippets": {
+         "enabled": false
+      },
       "system": {
          "enabled": false
       },

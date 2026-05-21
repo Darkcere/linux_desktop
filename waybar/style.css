@@ -16,13 +16,36 @@
   border-radius: 5px;
   border: 2px solid #cfc5b5;
 }
-#workspaces button {
-  color: #72674d;
-  padding-left: 0.4em;
+#workspaces {  font-size: 0.4em;
+  padding: 1px 4px;
+  margin: 7px 0;
+}
+#workspaces button {  
+  background: #71644c;
+  padding: 0 2px;
+  margin: 0 2px;
+  border-radius: 99px;
+  min-width:4px;
+  transition: all 200ms ease-in-out;
+}
+#workspaces button:hover {
+  min-width: 10px;
 }
 
+#workspaces button.urgent{
+  background: #ff8678;
+}
+
+#workspaces button.active{
+  background: #8f7f61;
+  min-width: 30px;
+  transition: all 200ms ease-in-out;
+}
 #workspaces button.empty {
-  color:#cfc5b5;
+  background:rgba(207, 197, 181, 0.8);
+}
+#workspaces button.empty.active {
+  background:#cfc5b5;
 }
 
 #memory,
@@ -40,20 +63,18 @@
   padding-right: 0.5em;
 }
 #tray {
-  margin-top: 0.2em;
-  margin-bottom: 0.2em;
+  margin: 0.21em 0;
+  padding-left: 1px;
+  padding-right: 2px;
+  margin-right: 0.2em;
+  background-color: rgba(52, 46, 35, 0.7);
+  border-radius: 5px;
+  border-left: 2px solid #cfc5b5;
+}
+#custom-swaync {
   margin-right: 0.5em;
-  background-color: #635943;
-  border-radius: 10px;
-  border: 2px solid #cfc5b5;
 }
 
-#window {
-  padding-left: 0.5em;
-}
-#custom-swaync{
-  padding-right: 0.5em;
-}
 #custom-arch-logo{
   padding-left: 0.6em;
 }
@@ -69,7 +90,7 @@
     min-height: 10px;
     min-width: 100px;
     border-radius: 5px;
-    background-color: #635943;
+    background-color: #625642;
 }
 #pulseaudio-slider highlight {
     min-width: 10px;

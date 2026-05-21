@@ -3,7 +3,7 @@
     "position": "top",
     "margin-left": 7,
     "margin-right": 7,
-    "margin-top": 2,
+    "margin-top": 3,
     "height": 26,
     "spacing": 3,
     "reload_style_on_change": true,
@@ -33,7 +33,7 @@
     },
 
     "hyprland/workspaces": {
-        "format": "{icon}",
+        "format": "",
         "on-click": "activate",
         "tooltip": false,
         "on-scroll-down": "hyprctl dispatch workspace +1",
@@ -48,7 +48,9 @@
             "3": [],
             "4": [],
             "5": []
-        }
+        },
+        "cursor": false,
+        "tooltip": true
     },
 
     "clock": {
@@ -92,9 +94,9 @@
     },
 
     "tray": {
-        "icon-size": 18,
-        "spacing": 5,
-        "tooltip": false,
+        "icon-size": 16,
+        "spacing": 2,
+        "tooltip": true,
         "ignored-icons": [
             "waybar"
         ]

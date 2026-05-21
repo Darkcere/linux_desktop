@@ -23,11 +23,13 @@ toggle_gamemode() {
             keyword general:border_size 1;\
             keyword decoration:rounding 0;\
             keyword misc:vfr 1"\ 
+        pkill -SIGUSR1 waybar
         swaync-client -dn
         powerprofilesctl set performance
         exit
     fi
     hyprctl reload
+    pkill -SIGUSR1 waybar
     swaync-client -df
     powerprofilesctl set balanced
 }

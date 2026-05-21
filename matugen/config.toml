@@ -1,9 +1,9 @@
 [config]
 reload_apps = true
-
+contrast = 0.1
 [config.wallpaper]
 command = "awww"
-arguments = [ "img", "-t", "fade", "--transition-duration", "0.5", "--transition-step", "255", "--transition-fps", "60", "-f", "Nearest",]
+arguments = [ "img", "-t", "fade", "--transition-duration", "1.0", "--transition-step", "255", "--transition-fps", "60", "-f", "Nearest",]
 set = true
 [templates.hyprland]
 input_path = "~/.config/Ax-Shell/config/matugen/templates/hyprland-colors.conf"
@@ -25,12 +25,17 @@ output_path = "/home/duarte/.local/state/caelestia/sequences.txt"
 [templates.qt6ct]
 input_path = "./templates/qt6ct.conf"
 output_path = "/home/duarte/.config/qt6ct/colors/matugen.conf"
+[templates.qt5ct]
+input_path = "./templates/qt6ct.conf"
+output_path = "/home/duarte/.config/qt5ct/colors/matugen.conf"
 [templates.gtk4]
 input_path = "./templates/gtk.css"
 output_path = "/home/duarte/.config/gtk-4.0/colors.css"
+post_hook = '~/.config/matugen/templates/scripts/gtk-post-hook.sh'
 [templates.gtk3]
 input_path = "./templates/gtk.css"
 output_path = "/home/duarte/.config/gtk-3.0/colors.css"
+post_hook = 'gsettings set org.gnome.desktop.interface gtk-theme ""; gsettings set org.gnome.desktop.interface gtk-theme adw-gtk3-{{mode}}'
 
 [config.custom_colors.red]
 color = "#FF0000"
