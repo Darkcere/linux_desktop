@@ -11,17 +11,20 @@
 }
 
 #waybar {
-  color: #cfc5b5;
-  background-color: #141312;
+  color: #d3bbff;
+  background-color: #141218;
   border-radius: 5px;
-  border: 2px solid #cfc5b5;
+  border: 2px solid #d3bbff;
+}
+.modules-right{
+  margin-right: 0.3em;
 }
 #workspaces {  font-size: 0.4em;
   padding: 1px 4px;
   margin: 7px 0;
 }
 #workspaces button {  
-  background: #71644c;
+  background: #6434ba;
   padding: 0 2px;
   margin: 0 2px;
   border-radius: 99px;
@@ -37,15 +40,15 @@
 }
 
 #workspaces button.active{
-  background: #8f7f61;
+  background: #7f53ce;
   min-width: 30px;
   transition: all 200ms ease-in-out;
 }
 #workspaces button.empty {
-  background:rgba(207, 197, 181, 0.8);
+  background:rgba(211, 187, 255, 0.8);
 }
 #workspaces button.empty.active {
-  background:#cfc5b5;
+  background:#d3bbff;
 }
 
 #memory,
@@ -53,26 +56,30 @@
   padding-left: 1em
 }
 
-#wireplumber,
+
 #battery,
 #idle_inhibitor,
 #language,
 #network,
-#bluetooth,
-#pulseaudio {
+#bluetooth {
   padding-right: 0.5em;
+}
+#pulseaudio {
+  padding-right: 0.4em;
+}
+#wireplumber {
+  padding-right: 0.25em;
 }
 #tray {
   margin: 0.21em 0;
   padding-left: 1px;
   padding-right: 2px;
-  margin-right: 0.2em;
-  background-color: rgba(52, 46, 35, 0.7);
+  background-color: rgba(57, 30, 106, 0.7);
   border-radius: 5px;
-  border-left: 2px solid #cfc5b5;
+  border-left: 2px solid #d3bbff;
 }
 #custom-swaync {
-  margin-right: 0.5em;
+  margin-right: 0.3em;
 }
 
 #custom-arch-logo{
@@ -90,10 +97,10 @@
     min-height: 10px;
     min-width: 100px;
     border-radius: 5px;
-    background-color: #625642;
+    background-color: #592fa6;
 }
 #pulseaudio-slider highlight {
     min-width: 10px;
     border-radius: 5px;
-    background-color: #cfc5b5;
+    background-color: #d3bbff;
 }

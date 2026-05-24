@@ -16,6 +16,9 @@
   border-radius: 5px;
   border: 2px solid {{colors.primary.default.hex}};
 }
+.modules-right{
+  margin-right: 0.3em;
+}
 #workspaces {  font-size: 0.4em;
   padding: 1px 4px;
   margin: 7px 0;
@@ -53,26 +56,30 @@
   padding-left: 1em
 }
 
-#wireplumber,
+
 #battery,
 #idle_inhibitor,
 #language,
 #network,
-#bluetooth,
-#pulseaudio {
+#bluetooth {
   padding-right: 0.5em;
+}
+#pulseaudio {
+  padding-right: 0.4em;
+}
+#wireplumber {
+  padding-right: 0.25em;
 }
 #tray {
   margin: 0.21em 0;
   padding-left: 1px;
   padding-right: 2px;
-  margin-right: 0.2em;
   background-color: {{colors.on_primary.default.rgba | set_alpha: 0.7 }};
   border-radius: 5px;
   border-left: 2px solid {{colors.primary.default.hex}};
 }
 #custom-swaync {
-  margin-right: 0.5em;
+  margin-right: 0.3em;
 }
 
 #custom-arch-logo{
