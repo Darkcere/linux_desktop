@@ -16,11 +16,11 @@ case "$CHOICE" in
   ;;
 "Power Off System")
   echo "Shutting down system..."
-  hyprshutdown -t 'Shutting down...' --post-cmd 'shutdown -P 0'
+  hyprshutdown -t 'Shutting down...' --post-cmd 'systemctl poweroff'
   ;;
 "Reboot System")
   echo "Rebooting system..."
-  hyprshutdown -t 'Restarting...' --post-cmd 'reboot'
+  hyprshutdown -t 'Restarting...' --post-cmd 'systemctl reboot'
   ;;
 "Lock Session")
   echo "Locking session..."

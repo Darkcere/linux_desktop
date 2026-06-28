@@ -65,10 +65,17 @@
   padding-right: 0.5em;
 }
 #pulseaudio {
-  padding-right: 0.4em;
+  padding-right: 0.2em;
 }
+#pulseaudio.microphone.source-muted {
+  margin-right: 0.4em;
+}
+
 #wireplumber {
   padding-right: 0.25em;
+}
+#wireplumber.muted {
+  margin-right: 0.5em;
 }
 #tray {
   margin: 0.21em 0;
@@ -81,7 +88,12 @@
 #custom-swaync {
   margin-right: 0.3em;
 }
-
+#custom-swaync.dnd-none {
+  margin-right: 0.5em;
+}
+#custom-swaync.dnd-notification {
+  margin-right: 0.5em;
+}
 #custom-arch-logo{
   padding-left: 0.6em;
 }

@@ -116,7 +116,7 @@
 
     "custom/swaync": {
         "tooltip": true,
-        "tooltip-format": "Left Click: Notifications\nRight Click: Do Not Disturb",
+        "tooltip-format": "{text} notifications\nLeft Click: Notifications\nRight Click: Do Not Disturb",
         "format": "{icon}",
         "format-icons": {
             "notification": "<span foreground='red'><sup></sup></span>",
@@ -125,8 +125,8 @@
             "dnd-none": "",
             "inhibited-notification": "<span foreground='red'><sup></sup></span>",
             "inhibited-none": "",
-            "dnd-inhibited-notification": "<span foreground='red'><sup></sup></span>",
-            "dnd-inhibited-none": ""
+            "dnd-inhibited-notification": " <span foreground='red'><sup></sup></span>",
+            "dnd-inhibited-none": " "
         },
         "return-type": "json",
         "exec-if": "which swaync-client",

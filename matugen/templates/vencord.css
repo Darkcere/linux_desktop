@@ -118,11 +118,11 @@ body {
     --reply-hover: linear-gradient(to right, color-mix(in hsl, var(--text-3), transparent 95%) 40%, transparent); /* background of messages that reply to you when hovered */
 
     /* status indicator colors */
-    --online: var(--green-2); /* change to #40a258 for default */
-    --dnd: var(--red-2); /* change to #d83a41 for default */
-    --idle: var(--yellow-2); /* change to #cc954c for default */
-    --streaming: var(--purple-2); /* change to ##9147ff for default */
-    --offline: var(--text-4); /* change to #82838b for default offline color */
+    --online: #40a258; /* change to #40a258 for default */
+    --dnd: #d83a41; /* change to #d83a41 for default */
+    --idle: #cc954c; /* change to #cc954c for default */
+    --streaming: #9147ff; /* change to ##9147ff for default */
+    --offline: #82838b; /* change to #82838b for default offline color */
 
     /* border colors */
     --border-light: var(--hover); /* general light border color */
@@ -159,11 +159,6 @@ body {
     --purple-3: {{colors.primary_fixed_dim.default.hex}};
     --purple-4: {{colors.primary_fixed_dim.default.hex}};
     --purple-5: {{colors.primary_fixed_dim.default.hex}};
-}
-
-
-/* customize things here */
-:root {
 	/* font, change to 'gg sans' for default discord font*/
 	--font: 'gg sans';
 
@@ -171,10 +166,10 @@ body {
 	--corner-text: 'Midnight';
 
 	/* color of status indicators and window controls */
-  --online-indicator: {{colors.inverse_primary.default.hex}};     /* change to #23a55a for default green */
-	--dnd-indicator: {{colors.error.default.hex}};                  /* change to #f13f43 for default red */
-	--idle-indicator: {{colors.tertiary_container.default.hex}};    /* change to #f0b232 for default yellow */
-	--streaming-indicator: {{colors.on_primary.default.hex}};       /* change to #593695 for default purple */
+  --online-indicator: #23a55a;     /* change to #23a55a for default green */
+	--dnd-indicator: #f13f43;                  /* change to #f13f43 for default red */
+	--idle-indicator: #f0b232;    /* change to #f0b232 for default yellow */
+	--streaming-indicator: #593695;       /* change to #593695 for default purple */
 
 	/* accent colors */
     --accent-1: {{colors.tertiary.default.hex}};            /* links */

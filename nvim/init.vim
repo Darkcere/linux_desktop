@@ -2,6 +2,7 @@
 " TTY / Foot terminal mode
 " =========================
 set notermguicolors
+
 " =========================
 " Leader
 " =========================
@@ -13,10 +14,31 @@ let mapleader = " "
 set number
 set autoindent
 set hlsearch
-set clipboard=unnamedplus
 set expandtab
 set shiftwidth=2
 set tabstop=2
+
+" Safe Dynamic Clipboard Logic for Root / Sudo
+if $USER == 'root' || $SUDO_USER != ''
+  " Force Neovim to use its built-in Lua OSC52 implementation when running as root
+  lua << EOF
+  vim.g.clipboard = {
+    name = 'OSC 52',
+    copy = {
+      ['+'] = require('vim.ui.clipboard.osc52').copy('+'),
+      ['*'] = require('vim.ui.clipboard.osc52').copy('*'),
+    },
+    paste = {
+      ['+'] = require('vim.ui.clipboard.osc52').paste('+'),
+      ['*'] = require('vim.ui.clipboard.osc52').paste('*'),
+    },
+  }
+EOF
+  set clipboard=unnamedplus
+else
+  " Your normal user clipboard configuration
+  set clipboard+=unnamedplus
+endif
 
 " =========================
 " Delete without yanking
@@ -107,6 +129,7 @@ vim.lsp.config('lua_ls', {
   }
 })
 EOF
+
 " =========================
 " Auto pairs
 " =========================

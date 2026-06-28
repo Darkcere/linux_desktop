@@ -15,7 +15,8 @@ CHOICE=$(
 [ -z "$CHOICE" ] && exit 0
 
 matugen --source-color-index 0 image "$CHOICE" -t scheme-content
+sh "$HOME/.config/hypr/scripts/colors_mqtt.sh"
 pkill waybar && waybar
 ln -sf "$CHOICE" "$HOME/.current.wall"
-sh "$HOME/.config/hypr/scripts/colors_mqtt.sh"
+
 

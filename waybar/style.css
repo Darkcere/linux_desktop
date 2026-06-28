@@ -11,10 +11,10 @@
 }
 
 #waybar {
-  color: #d3bbff;
-  background-color: #141218;
+  color: #a8c9f3;
+  background-color: #121316;
   border-radius: 5px;
-  border: 2px solid #d3bbff;
+  border: 2px solid #a8c9f3;
 }
 .modules-right{
   margin-right: 0.3em;
@@ -24,7 +24,7 @@
   margin: 7px 0;
 }
 #workspaces button {  
-  background: #6434ba;
+  background: #0d6ab1;
   padding: 0 2px;
   margin: 0 2px;
   border-radius: 99px;
@@ -40,15 +40,15 @@
 }
 
 #workspaces button.active{
-  background: #7f53ce;
+  background: #1086e1;
   min-width: 30px;
   transition: all 200ms ease-in-out;
 }
 #workspaces button.empty {
-  background:rgba(211, 187, 255, 0.8);
+  background:rgba(168, 201, 243, 0.8);
 }
 #workspaces button.empty.active {
-  background:#d3bbff;
+  background:#a8c9f3;
 }
 
 #memory,
@@ -65,23 +65,35 @@
   padding-right: 0.5em;
 }
 #pulseaudio {
-  padding-right: 0.4em;
+  padding-right: 0.2em;
 }
+#pulseaudio.microphone.source-muted {
+  margin-right: 0.4em;
+}
+
 #wireplumber {
   padding-right: 0.25em;
+}
+#wireplumber.muted {
+  margin-right: 0.5em;
 }
 #tray {
   margin: 0.21em 0;
   padding-left: 1px;
   padding-right: 2px;
-  background-color: rgba(57, 30, 106, 0.7);
+  background-color: rgba(6, 49, 82, 0.7);
   border-radius: 5px;
-  border-left: 2px solid #d3bbff;
+  border-left: 2px solid #a8c9f3;
 }
 #custom-swaync {
   margin-right: 0.3em;
 }
-
+#custom-swaync.dnd-none {
+  margin-right: 0.5em;
+}
+#custom-swaync.dnd-notification {
+  margin-right: 0.5em;
+}
 #custom-arch-logo{
   padding-left: 0.6em;
 }
@@ -97,10 +109,10 @@
     min-height: 10px;
     min-width: 100px;
     border-radius: 5px;
-    background-color: #592fa6;
+    background-color: #0b5c99;
 }
 #pulseaudio-slider highlight {
     min-width: 10px;
     border-radius: 5px;
-    background-color: #d3bbff;
+    background-color: #a8c9f3;
 }
