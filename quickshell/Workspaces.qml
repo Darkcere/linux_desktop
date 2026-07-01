@@ -64,7 +64,6 @@ Row {
             property bool isEmpty: (ws?.toplevels?.values?.length ?? 0) === 0
             property bool isUrgent: ws ? ws.urgent : false
 
-            implicitWidth: 0 
             implicitHeight: 8
             radius: 6
 
