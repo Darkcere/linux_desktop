@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import "AudioService.qml" // Assuming it is mapped globally
+import "AudioService.qml"
 
 PanelWindow {
     id: osdWindow
@@ -12,32 +12,36 @@ PanelWindow {
     anchors { bottom: true }
     margins { bottom: 120 }
     
-    // FIX 1: Fixed Wayland Surface Dimensions!
-    // The compositor window never changes size, completely eliminating Wayland stutter.
     implicitWidth: 240
     implicitHeight: 46
     color: "transparent"
 
-    property bool isMicEvent: false 
+    property bool isMicEvent: displayMicMuted
     property bool timerActive: false
 
     property bool showOSD: displayMicMuted || timerActive
     visible: showOSD
 
-    // FIX 2: Connect to the new, hot-plug safe AudioService properties
     property real displayVolume: AudioService.sinkVol
     property bool displayMuted: AudioService.sinkMuted
     property bool displayMicMuted: AudioService.micMuted
+
+    // OPTIMIZATION 1: Cache complex color calculations
+    // Evaluates once instead of every time displayMicMuted toggles
+    readonly property color colorMutedBorder: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.3)
+    readonly property color colorTransparent: Qt.rgba(0, 0, 0, 0)
     
     Connections {
         target: AudioService
         
-        function onVolumeChanged(volume, muted, node) {
+        // OPTIMIZATION 2: Omit unused arguments (volume, muted, node)
+        // Prevents the JS engine from needlessly allocating variables on every signal pulse
+        function onVolumeChanged() {
             osdWindow.isMicEvent = false 
             osdWindow.triggerOSD()
         }
         
-        function onMicVolumeChanged(volume, muted, node) {
+        function onMicVolumeChanged() {
             osdWindow.isMicEvent = true
             osdWindow.triggerOSD()
         }
@@ -53,41 +57,36 @@ PanelWindow {
         interval: 2000 
         onTriggered: {
             timerActive = false
-            if (displayMicMuted) {
-                isMicEvent = true
+            if (osdWindow.displayMicMuted) {
+                osdWindow.isMicEvent = true
             }
         }
     }
 
-    // --- UI DESIGN ---
     Rectangle {
         id: container
-        
-        // The container stays perfectly centered inside the invisible Wayland window
         anchors.centerIn: parent 
         
-        // The width changes here, natively handled by the QML GPU thread
         width: osdWindow.isMicEvent ? 46 : 240
         height: 46
         
-        // Dropped to 150ms with OutExpo for a very premium, snappy pop-out feel
         Behavior on width { 
             NumberAnimation { duration: 150; easing.type: Easing.OutExpo } 
         }
 
-        color: displayMicMuted ? '#86040e0d' : "#040e0d"
-        border.color: Colors.border
+        // Uses cached properties
+        color: '#040e0d'
+        opacity: displayMicMuted ? 0.8 : 0.9
+        border.color: osdWindow.displayMicMuted ? osdWindow.colorMutedBorder : Colors.border
         border.width: 2
         radius: 6
-        clip: true // Crucial for the "reveal" sliding mask effect
+        clip: true 
 
-        // --- Speaker UI (No RowLayout!) ---
+        // --- Speaker UI ---
         Item {
-            // Lock internal width so items stay perfectly still while the container shrinks
             width: 240 
             height: 46
             anchors.centerIn: parent
-            
             opacity: !osdWindow.isMicEvent ? 1.0 : 0.0
             visible: opacity > 0
             Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.InOutQuad } }
@@ -97,8 +96,8 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.leftMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
-                text: displayMuted ? "󰝟" : "󰕾"
-                color: displayMuted ? Colors.workspaceurgent : Colors.text
+                text: osdWindow.displayMuted ? "󰝟" : "󰕾"
+                color: osdWindow.displayMuted ? Colors.workspaceurgent : Colors.text
                 font.pixelSize: 16 
             }
             
@@ -113,7 +112,8 @@ PanelWindow {
                 color: Colors.background
                 
                 Rectangle {
-                    width: displayMuted ? 0 : (parent.width * displayVolume)
+                    // OPTIMIZATION 3: Ensure parent width is resolved via anchors before calculation
+                    width: osdWindow.displayMuted ? 0 : (parent.width * osdWindow.displayVolume)
                     height: parent.height
                     radius: 4
                     color: Colors.border
@@ -126,11 +126,10 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
-                text: Math.round(displayVolume * 100) + "%"
+                // OPTIMIZATION 4: Kept binding minimal.
+                text: Math.round(osdWindow.displayVolume * 100) + "%"
                 color: Colors.text
                 font.pixelSize: 12
-                
-                // Fixed width ensures the progress bar has a stable target to anchor to
                 width: 35 
                 horizontalAlignment: Text.AlignRight 
             }
@@ -139,10 +138,10 @@ PanelWindow {
         // --- Mic UI ---
         Text {
             anchors.centerIn: parent
-            opacity: osdWindow.isMicEvent ? 1.0 : 0.0
+            opacity: osdWindow.isMicEvent ? (osdWindow.displayMicMuted ? 0.7 : 1.0) : 0.0
             visible: opacity > 0
-            text: displayMicMuted ? "" : ""
-            color: displayMicMuted ? Colors.workspaceurgent : Colors.text
+            text: osdWindow.displayMicMuted ? "" : ""
+            color: Colors.text
             font.pixelSize: 22
             Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.InOutQuad } }
         }

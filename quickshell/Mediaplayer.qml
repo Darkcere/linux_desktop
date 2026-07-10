@@ -7,7 +7,6 @@ import Quickshell.Widgets
 
 Rectangle {
     id: root
-    HoverHandler { id: mediaplayerHover }
     implicitWidth: mainLayout.implicitWidth
     implicitHeight: 24
     color: "transparent"
@@ -45,8 +44,7 @@ Rectangle {
     // --- PROPERTIES ---
     property string title: player?.trackTitle || ""
     property string artist: player?.trackArtist || ""
-    property string cachedArt: root.player && root.player.trackArtUrl ? root.player.trackArtUrl : ""
-    property string albumArt: cachedArt
+    property string albumArt: root.player?.trackArtUrl ?? ""
     property bool playing: player?.isPlaying ?? false
     
     Instantiator {
@@ -76,7 +74,6 @@ Rectangle {
             // The Spinning Item
             HoverHandler {
                 id: artcontainerHover
-                margin: 30
             }
             Item {
                 id: spinnerItem
@@ -143,13 +140,13 @@ Rectangle {
                 id: controlsLoader
                 z: 1000 
                 anchors.centerIn: artContainer
+                active: artcontainerHover.hovered || controlsHover.hovered 
+                HoverHandler {
+                    id: controlsHover
+                }
                 
-                // Keep the loader active so it doesn't destroy/recreate itself
-                active: true 
-                
-                // Show/hide based on hover
                 visible: opacity > 0
-                opacity: artcontainerHover.hovered ? 1.0 : 0.0
+                opacity: active ? 1.0 : 0.0
                 
                 Behavior on opacity { NumberAnimation { duration: 150 } }
                 
@@ -204,7 +201,7 @@ Rectangle {
             active: mediaHover.hovered 
             text: {
                 if (!root.player) return "";
-                let albumInfo = root.player.trackAlbum ? "\n󰀥  " + root.player.trackAlbum : "";
+                let albumInfo = root.player?.trackAlbum ? "\n󰀥  " + root.player.trackAlbum : "";
                 return "󰝚  " + root.title + "\n󰠃  " + root.artist + albumInfo;
             }
             topMargin: 18

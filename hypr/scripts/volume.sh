@@ -44,7 +44,7 @@ inc_volume() {
   if [ "$(pamixer --get-mute)" == "true" ]; then
     toggle_mute
   else
-    pamixer -i 5 && notify_user
+    pamixer -i 5 && "$sDIR/Sounds.sh" --volume
   fi
 }
 
@@ -53,25 +53,25 @@ dec_volume() {
   if [ "$(pamixer --get-mute)" == "true" ]; then
     toggle_mute
   else
-    pamixer -d 5 && notify_user
+    pamixer -d 5 && "$sDIR/Sounds.sh" --volume
   fi
 }
 
 # Toggle Mute
 toggle_mute() {
   if [ "$(pamixer --get-mute)" == "false" ]; then
-    pamixer -m && notify-send -t 1000 -e -u critical -i "$iDIR/volume-mute.png" "Volume Switched OFF"
+    pamixer -m 
   elif [ "$(pamixer --get-mute)" == "true" ]; then
-    pamixer -u && notify-send -t 1000 -e -u critical -i "$(get_icon)" "Volume Switched ON"
+    pamixer -u 
   fi
 }
 
 # Toggle Mic
 toggle_mic() {
   if [ "$(pamixer --default-source --get-mute)" == "false" ]; then
-    pamixer --default-source -m && notify-send -t 1000000000 -e -u critical -i "$iDIR/microphone-mute.png" "Microphone Switched OFF" && paplay /usr/share/sounds/ocean/stereo/outcome-failure.oga
+    pamixer --default-source -m && paplay /usr/share/sounds/ocean/stereo/outcome-failure.oga 
   elif [ "$(pamixer --default-source --get-mute)" == "true" ]; then
-    pamixer -u --default-source u && notify-send -t 1000 -e -u critical -i "$iDIR/microphone.png" "Microphone Switched ON" && paplay /usr/share/sounds/ocean/stereo/outcome-success.oga && swaync-client --close-all
+    pamixer -u --default-source u && paplay /usr/share/sounds/ocean/stereo/outcome-success.oga 
   fi
 }
 # Get Mic Icon
@@ -106,7 +106,7 @@ inc_mic_volume() {
   if [ "$(pamixer --default-source --get-mute)" == "true" ]; then
     toggle_mic
   else
-    pamixer --default-source -i 5 && notify_mic_user
+    pamixer --default-source -i 5 
   fi
 }
 
@@ -115,7 +115,7 @@ dec_mic_volume() {
   if [ "$(pamixer --default-source --get-mute)" == "true" ]; then
     toggle-mic
   else
-    pamixer --default-source -d 5 && notify_mic_user
+    pamixer --default-source -d 5 
   fi
 }
 

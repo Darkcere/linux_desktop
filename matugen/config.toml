@@ -1,16 +1,16 @@
 [config]
 reload_apps = true
 contrast = 0.1
-[config.wallpaper]
-command = "awww"
-arguments = [ "img", "-t", "fade", "--transition-duration", "1.0", "--transition-step", "255", "--transition-fps", "60", "-f", "Nearest",]
-set = true
+#[config.wallpaper]
+#command = "awww"
+#arguments = [ "img", "-t", "fade", "--transition-duration", "1.0", "--transition-step", "255", "--transition-fps", "60", "-f", "Nearest",]
+#set = true
 [templates.hyprland]
 input_path = "~/.config/Ax-Shell/config/matugen/templates/hyprland-colors.conf"
 output_path = "~/.config/Ax-Shell/config/hypr/colors.conf"
-[templates.waybar]                                                                                                                                                             
-input_path = "~/.config/Ax-Shell/config/matugen/templates/waybar.css"                                                                                                            
-output_path = "~/.config/waybar/style.css"
+#[templates.waybar]                                                                                                                                                             
+#input_path = "~/.config/Ax-Shell/config/matugen/templates/waybar.css"                                                                                                            
+#output_path = "~/.config/waybar/style.css"
 [templates.vicinae]
 input_path = './templates/vicinae.toml'
 output_path = '~/.local/share/vicinae/themes/matugen.toml'
@@ -40,8 +40,8 @@ output_path = '~/.config/foot/foot.ini'
 input_path = '~/.config/matugen/templates/vencord.css'
 output_path = '~/.config/Vencord/themes/matugen-discord.css'
 [templates.qml]
-input_path = '~/.config/matugen/templates/Colors.qml'
-output_path = '~/.config/quickshell/Colors.qml'
+input_path = '~/.config/matugen/templates/colors_quickshell.json'
+output_path = '~/.config/quickshell/colors.json'
 [config.custom_colors.red]
 color = "#FF0000"
 blend = true

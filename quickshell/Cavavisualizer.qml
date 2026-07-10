@@ -13,7 +13,7 @@ Row {
 
     Process {
         id: cavaProc
-        command: ["sh", "-c", "cava -p ~/.config/cava/quickshell.conf"]
+        command: ["sh", "-c", "exec cava -p ~/.config/cava/quickshell.conf"]
         running: true
         
         stdout: SplitParser {

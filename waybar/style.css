@@ -11,10 +11,10 @@
 }
 
 #waybar {
-  color: #cfbcff;
-  background-color: #141317;
+  color: #ffafd7;
+  background-color: #181214;
   border-radius: 5px;
-  border: 2px solid #cfbcff;
+  border: 2px solid #ffafd7;
 }
 .modules-right{
   margin-right: 0.3em;
@@ -24,7 +24,7 @@
   margin: 7px 0;
 }
 #workspaces button {  
-  background: #5d3ab2;
+  background: #a52b78;
   padding: 0 2px;
   margin: 0 2px;
   border-radius: 99px;
@@ -40,15 +40,15 @@
 }
 
 #workspaces button.active{
-  background: #7857c8;
+  background: #cb3894;
   min-width: 30px;
   transition: all 200ms ease-in-out;
 }
 #workspaces button.empty {
-  background:rgba(207, 188, 255, 0.8);
+  background:rgba(255, 175, 215, 0.8);
 }
 #workspaces button.empty.active {
-  background:#cfbcff;
+  background:#ffafd7;
 }
 
 #memory,
@@ -81,9 +81,9 @@
   margin: 0.21em 0;
   padding-left: 1px;
   padding-right: 2px;
-  background-color: rgba(53, 33, 101, 0.7);
+  background-color: rgba(84, 22, 61, 0.7);
   border-radius: 5px;
-  border-left: 2px solid #cfbcff;
+  border-left: 2px solid #ffafd7;
 }
 #custom-swaync {
   margin-right: 0.3em;
@@ -109,10 +109,10 @@
     min-height: 10px;
     min-width: 100px;
     border-radius: 5px;
-    background-color: #53349f;
+    background-color: #912669;
 }
 #pulseaudio-slider highlight {
     min-width: 10px;
     border-radius: 5px;
-    background-color: #cfbcff;
+    background-color: #ffafd7;
 }

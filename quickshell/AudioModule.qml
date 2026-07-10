@@ -71,7 +71,6 @@ Row {
     // --- 3. Volume Percentage ---
     Text {
         anchors.verticalCenter: parent.verticalCenter
-        horizontalAlignment: Text.AlignLeft 
         text: Math.round((AudioService.sink?.audio?.volume ?? 0) * 100) + "%"
         color: root.activeColor
         font.pixelSize: 12
@@ -128,8 +127,8 @@ Row {
             handle: Rectangle {
                 x: volumeSlider.leftPadding + volumeSlider.visualPosition * (volumeSlider.availableWidth - width)
                 y: volumeSlider.topPadding + volumeSlider.availableHeight / 2 - height / 2
-                implicitWidth: 10
-                implicitHeight: 10
+                implicitWidth: 7
+                implicitHeight: 7
                 radius: 5
                 color: root.activeColor
             }
@@ -149,7 +148,7 @@ Row {
                 cursorShape: Qt.PointingHandCursor
                 acceptedButtons: Qt.NoButton 
                 // In Slider MouseArea
-    onWheel: (wheel) => root.changeVolume(wheel.angleDelta.y, 0.01)
+                onWheel: (wheel) => root.changeVolume(wheel.angleDelta.y, 0.01)
             }
         }
     }
@@ -158,7 +157,7 @@ Row {
     BarToolTip {
         // FIX: Swapped out the broken "rootContainer" reference for your actual root ID
         targetItem: micHover.hovered ? micIcon : (speakerHover.hovered ? speakerIcon : root)
-        topMargin: 20
+        topMargin: 22
         active: (micHover.hovered || speakerHover.hovered)
         
         text: {

@@ -1,8 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Hyprland 
-import Quickshell.Services.SystemTray
 
 PopupWindow {
     id: menuWindow
@@ -25,7 +23,7 @@ PopupWindow {
     anchor {
         window: menuWindow.parentBarWindow
         rect.x: menuWindow.targetX
-        rect.y: menuWindow.parentBarWindow.height + 1
+        rect.y: menuWindow.parentBarWindow.height - 2
     }
 
     implicitWidth: menuLayout.implicitWidth + 12
@@ -50,7 +48,17 @@ PopupWindow {
         border.color: Colors.border
         border.width: 2
         radius: 5
-
+        // Grow exactly from the top-right where it connects to the bar
+        transformOrigin: Item.TopRight
+        
+        scale: menuWindow.visible ? 1.0 : 0.85
+        opacity: menuWindow.visible ? 1.0 : 0.0
+        Behavior on scale {
+            NumberAnimation { duration: 200; easing.type: Easing.OutBack }
+        }
+        Behavior on opacity {
+            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+        }
         ColumnLayout {
             id: menuLayout
             anchors.fill: parent
@@ -86,7 +94,7 @@ PopupWindow {
                         color: itemMouseArea.containsMouse ? Colors.workspaceactive : "transparent"
                         radius: 3
                         property string cleanText: modelData.text ? modelData.text.replace(/&/g, "") : ""
-
+                        
                         RowLayout {
                             id: menuContentRow
                             anchors.fill: parent
