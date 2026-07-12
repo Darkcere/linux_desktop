@@ -10,54 +10,50 @@ Rectangle {
     implicitWidth: mainLayout.implicitWidth
     implicitHeight: 24
     color: "transparent"
-    property var player: null
+    enabled: root.Window.visibility !== Window.Hidden
 
-    function updatePlayer() {
-        const list = Mpris.players.values;
-        if (!list || list.length === 0) {
-            player = null;
-            return;
-        }
+    // Use a binding property. It re-evaluates automatically whenever Mpris.players.values changes.
+    property var player: {
+        // 1. Get the list and filter out the playerctld daemon
+        const rawList = Mpris.players.values;
+        const list = rawList.filter(p => !p.dbusName.includes("playerctld"));
+        
+        if (!list || list.length === 0) return null;
 
-        // 1. Check if any OTHER player is actually playing right now
-        const currentlyPlaying = list.find(p => p.isPlaying);
+        // 2. Prioritize actively playing
+        const active = list.find(p => p.isPlaying);
+        if (active) return active;
 
-        // 2. STICKINESS LOGIC:
-        // If we have a player, and it's playing, keep it.
-        // If it's paused, ONLY switch if another player has started playing.
-        let target;
-        if (root.player && root.player.isPlaying) {
-            target = root.player;
-        } else if (currentlyPlaying) {
-            target = currentlyPlaying;
-        } else {
-            // Nothing is playing. Keep the current one if it exists, 
-            // otherwise default to the first one available.
-            target = root.player || list[0];
-        }
+        // 3. Fallback to existing player if it's still in the filtered list
+        if (root.player && list.includes(root.player)) return root.player;
 
-        if (root.player !== target) {
-            root.player = target;
+        // 4. Fallback to first available
+        return list[0];
+    }
+
+    // Connect to global player changes so the binding triggers
+    Connections {
+        target: Mpris
+        function onPlayersChanged() { 
+            // Trigger a re-evaluation of the binding by forcing a property refresh
+            // We don't set it to null; we let the binding engine do its job.
+            root.player = Qt.binding(function() {
+                const rawList = Mpris.players.values;
+                const list = rawList.filter(p => !p.dbusName.includes("playerctld"));
+                if (!list || list.length === 0) return null;
+                const active = list.find(p => p.isPlaying);
+                if (active) return active;
+                if (root.player && list.includes(root.player)) return root.player;
+                return list[0];
+            });
         }
     }
 
     // --- PROPERTIES ---
     property string title: player?.trackTitle || ""
     property string artist: player?.trackArtist || ""
-    property string albumArt: root.player?.trackArtUrl ?? ""
+    property string albumArt: player?.trackArtUrl ?? ""
     property bool playing: player?.isPlaying ?? false
-    
-    Instantiator {
-        model: Mpris.players.values
-        onObjectAdded: updatePlayer()
-        onObjectRemoved: updatePlayer()
-        delegate: Connections {
-            target: modelData
-            ignoreUnknownSignals: true
-            function onPlaybackStateChanged() { updatePlayer() }
-            function onTrackChanged() { updatePlayer() }
-        }
-    }
 
     // --- MAIN LAYOUT ---
     RowLayout {
@@ -70,32 +66,29 @@ Rectangle {
             id: artContainer
             Layout.preferredWidth: 22
             Layout.preferredHeight: 22
-            visible: root.player ? true : false
-            // The Spinning Item
+            visible: root.player !== null
+            
             HoverHandler {
                 id: artcontainerHover
             }
+            
             Item {
                 id: spinnerItem
                 anchors.fill: parent
-
-                // This handles the smooth spinning without any timers
+                opacity: root.playing ? 1.0 : 0.7
+                
                 RotationAnimator {
                     target: spinnerItem
                     from: 0
                     to: 360
-                    duration: 8000 
+                    duration: 13000 
                     loops: Animation.Infinite
-                    
-                    // Keep running: true so it doesn't destroy/reset the animation
                     running: true 
-                    
-                    // Use paused to stop the movement when NOT playing
                     paused: !root.playing 
                 }
 
-                // Mask for the circle shape
                 Rectangle {
+                    
                     id: maskRect
                     width: 22; height: 22; radius: 11; visible: false
                 }
@@ -106,10 +99,18 @@ Rectangle {
                 }
 
                 Component {
+                    
                     id: artImageComp
                     Image {
                         source: root.albumArt
                         fillMode: Image.PreserveAspectCrop
+                        
+                        // OPTIMIZATION 1: Prevent main-thread freezing when changing tracks
+                        asynchronous: true
+                        
+                        // OPTIMIZATION 2: Cap VRAM usage. Rendered at 44x44 for High-DPI crispness
+                        sourceSize: Qt.size(44, 44)
+                        
                         layer.enabled: true
                         layer.effect: OpacityMask { maskSource: maskRect }
                     }
@@ -118,6 +119,7 @@ Rectangle {
                 Component {
                     id: vinylComp
                     Rectangle {
+                        
                         color: Colors.border
                         radius: 11
                         border.width: 2
@@ -159,7 +161,6 @@ Rectangle {
                             anchors.centerIn: parent
                             spacing: 20 
                             
-                            // Buttons remain the same
                             Text { text: "󰒮"; color: "#FFFFFF"; font.pixelSize: 12
                                 MouseArea { anchors.fill: parent; anchors.margins: -5; cursorShape: Qt.PointingHandCursor; onClicked: root.player?.previous() }
                             }
@@ -176,7 +177,6 @@ Rectangle {
         }
 
         Cavavisualizer {
-            enabled: root.Window.visibility !== Window.Hidden
             z: -1
         }
         

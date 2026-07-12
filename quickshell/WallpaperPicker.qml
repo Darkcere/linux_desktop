@@ -3,7 +3,7 @@ import QtQuick
 import QtQuick.Controls 
 import QtCore 
 import Quickshell.Io 
-import Qt5Compat.GraphicalEffects // 🚀 ADDED: Required to cut rounded corners on images
+import Qt5Compat.GraphicalEffects
 
 Item {
     id: pickerWindow
@@ -24,6 +24,7 @@ Item {
     }
 
     Component.onCompleted: {
+        // Run ONLY ONCE at startup
         fetchWallpapersProcess.running = true
     }
     
@@ -31,6 +32,7 @@ Item {
         id: focusTimer
         interval: 50
         onTriggered: {
+            // This will trigger onTextChanged -> searchDebounce -> filterWallpapers IF text wasn't already empty
             searchInput.text = ""
             searchInput.forceActiveFocus()
         }
@@ -42,23 +44,31 @@ Item {
         onTriggered: pickerWindow.filterWallpapers(searchInput.text)
     }
     
+    // OPTIMIZATION: Removed backgroundScanTimer. We don't need to os.walk every time we open the menu.
     Timer {
-        id: backgroundScanTimer
-        interval: 400 
-        onTriggered: fetchWallpapersProcess.running = true
+        id: loadDelayTimer
+        interval: 350 // Match your morphSpeed
+        onTriggered: filterWallpapers(searchInput.text)
     }
-    
     onIsOpenChanged: {
         if (isOpen) {
             focusTimer.start()
-            pickerWindow.rollRandomWallpaper()
-
-            if (searchInput.text !== "") {
-                searchInput.text = ""
-            } else if (wallpaperModel.count === 0 && allWallpapersData.length > 0) {
-                filterWallpapers("")
+            loadDelayTimer.start()
+            
+            // If the model is empty (e.g. first load) but we have data, populate it immediately
+            if (searchInput.text === "" && wallpaperModel.count === 0 && allWallpapersData.length > 0) {
+                 filterWallpapers("")
             }
-            backgroundScanTimer.start()
+        }
+    }
+
+    // OPTIMIZATION: Manual refresh for when you actually add a new wallpaper
+    Shortcut {
+        sequence: "Ctrl+R"
+        enabled: pickerWindow.isOpen
+        onActivated: {
+            console.log("QUICKSHELL: Manually refreshing wallpaper directory...")
+            fetchWallpapersProcess.running = true
         }
     }
 
@@ -89,18 +99,20 @@ Item {
         }
         
         pickerWindow.activeWallpaperPath = targetPath;
-        
         pickerWindow.wallpaperSelected(targetPath);
-        pickerWindow.closeRequested();
         
+        // EXECUTE IMMEDIATELY
+        // No timer needed. Quickshell.execDetached runs it as a standalone process.
         let bashCmd = `
             echo "${targetPath}" > "$HOME/.current_wall_path"
             ln -sf "${targetPath}" "$HOME/.current.wall"
             hyprctl dispatch global quickshell:updateWallpaper
         `;
         
-        applyThemeTimer.pendingCmd = bashCmd;
-        applyThemeTimer.start();
+        Quickshell.execDetached({ command: ["bash", "-c", bashCmd] });
+        
+        // Close the UI
+        pickerWindow.closeRequested();
         
         if (entry.rawPath === "random_trigger") {
             pickerWindow.rollRandomWallpaper();
@@ -224,7 +236,7 @@ Item {
                 focus: true 
                 
                 Text {
-                    text: "Search Wallpapers..."
+                    text: "Search Wallpapers... (Ctrl+R to refresh)"
                     color: Colors.workspaceactive
                     opacity: 0.4
                     font.pixelSize: 16
@@ -289,7 +301,7 @@ Item {
                 cellHeight: 120 
                 flickableDirection: Flickable.VerticalFlick 
 
-                cacheBuffer: 1000 
+                cacheBuffer: 100
                 displayMarginBeginning: 0
                 displayMarginEnd: 0
                 
@@ -321,15 +333,13 @@ Item {
                         color: (wpMouseArea.containsMouse || wallpaperGrid.currentIndex === index) ? Qt.rgba(Colors.workspaceactive.r, Colors.workspaceactive.g, Colors.workspaceactive.b, 0.2) : "transparent"
                         radius: 8
                         
-                        // 🚀 1. The Shape Mask for the Image
                         Rectangle {
                             id: thumbMask
                             anchors.fill: parent
                             radius: 8
-                            visible: false // Must be invisible, used only by OpacityMask
+                            visible: false
                         }
                         
-                        // 🚀 2. The Raw Image (Hidden)
                         Image {
                             id: thumbImg
                             anchors.fill: parent
@@ -340,12 +350,11 @@ Item {
                             
                             asynchronous: true 
                             cache: true 
-                            sourceSize: Qt.size(256, 256)
+                            sourceSize: Qt.size(128, 128)
                             
-                            visible: false // Must be invisible, rendered by OpacityMask
+                            visible: false
                         }
                         
-                        // 🚀 3. The Masked Output!
                         OpacityMask {
                             anchors.fill: parent
                             source: thumbImg
@@ -371,7 +380,6 @@ Item {
                             Behavior on opacity { NumberAnimation { duration: 150 } }
                         }
 
-                        // The Border Overlay
                         Rectangle {
                             anchors.fill: parent
                             color: "transparent"
@@ -432,7 +440,6 @@ Item {
                         height: parent.height - 70 
                         color: "transparent"
 
-                        // 🚀 1. Shape Mask for Large Preview
                         Rectangle {
                             id: largeMask
                             anchors.fill: parent
@@ -440,7 +447,6 @@ Item {
                             visible: false
                         }
 
-                        // 🚀 2. Raw Image
                         Image {
                             id: largeImg
                             anchors.fill: parent
@@ -455,11 +461,10 @@ Item {
                             fillMode: Image.PreserveAspectFit
                             asynchronous: true
                             cache: true
-                            sourceSize: Qt.size(512, 512)
+                            sourceSize: Qt.size(256, 256)
                             visible: false
                         }
 
-                        // 🚀 3. Masked Output
                         OpacityMask {
                             anchors.fill: parent
                             source: largeImg
@@ -527,7 +532,6 @@ Item {
                     height: 39
                     color: "transparent"
                     
-                    // 🚀 1. Shape Mask for Bottom Panel
                     Rectangle {
                         id: bottomMask
                         anchors.fill: parent
@@ -535,7 +539,6 @@ Item {
                         visible: false
                     }
                     
-                    // 🚀 2. Raw Image
                     Image {
                         id: bottomImg
                         anchors.fill: parent
@@ -543,11 +546,10 @@ Item {
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
-                        sourceSize: Qt.size(100, 60)
+                        sourceSize: Qt.size(64, 64)
                         visible: false
                     }
 
-                    // 🚀 3. Masked Output
                     OpacityMask {
                         anchors.fill: parent
                         source: bottomImg

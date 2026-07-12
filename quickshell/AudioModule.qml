@@ -9,7 +9,10 @@ Row {
     spacing: 4 
     
     property color activeColor: AudioService.protectionTriggered ? Colors.workspaceurgent : Colors.text
-
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        onTapped: mainBarWindow.menuHandler.toggleAudio()
+    }
     HoverHandler { id: moduleHover }
     property bool showSlider: moduleHover.hovered || volumeSlider.pressed
 
@@ -155,20 +158,18 @@ Row {
 
     // --- 5. Custom Quickshell Tooltip ---
     BarToolTip {
-        // FIX: Swapped out the broken "rootContainer" reference for your actual root ID
-        targetItem: micHover.hovered ? micIcon : (speakerHover.hovered ? speakerIcon : root)
+        targetItem: root
         topMargin: 22
-        active: (micHover.hovered || speakerHover.hovered)
+        active: moduleHover.hovered 
         
         text: {
-            if (micHover.hovered) {
-                return (AudioService.source?.audio?.muted ? "󰍭 Input Muted" : "󰍬 Input Active") + 
-                       " - Vol: " + Math.round((AudioService.source?.audio?.volume ?? 0) * 100) + "%";
-            } else if (speakerHover.hovered) {
-                return (AudioService.sink?.audio?.muted ? "󰝟 Output Muted" : "󰕾 Output Active") + 
-                       " - Vol: " + Math.round((AudioService.sink?.audio?.volume ?? 0) * 100) + "%";
-            }
-            return "";
+            let sink = AudioService.sink?.audio;
+            let source = AudioService.source?.audio;
+            
+            let sinkText = (sink?.muted ? "󰝟 " : "󰕾 ") + " Out: " + Math.round((sink?.volume ?? 0) * 100) + "%";
+            let sourceText = (source?.muted ? "󰍭 " : "󰍬 ") + " In: " + Math.round((source?.volume ?? 0) * 100) + "%";
+            
+            return sourceText + " | " + sinkText + "\nRight click to open Menu";
         }
     }
 }

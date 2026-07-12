@@ -2,152 +2,125 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 
-PopupWindow {
-    id: menuWindow
-    visible: false
-    
-    // This is the native, stable way to handle "click outside to close"
-    grabFocus: true 
-    
-    required property var parentBarWindow
+Item {
+    id: menuRoot
+
     property var activeItem: null
-    property int targetX: 0
+    property bool isOpen: false
 
-    // Reset state when the menu is hidden
-    onVisibleChanged: {
-        if (!visible) {
-            menuWindow.activeItem = null;
-        }
-    }
-    
-    anchor {
-        window: menuWindow.parentBarWindow
-        rect.x: menuWindow.targetX
-        rect.y: menuWindow.parentBarWindow.height - 2
-    }
+    signal closeRequested()
 
-    implicitWidth: menuLayout.implicitWidth + 12
+    implicitWidth: menuLayout.implicitWidth + 20
     implicitHeight: menuLayout.implicitHeight + 12
-    color: "transparent"
-    
+
     Shortcut {
-        sequences: ["Escape"]
-        onActivated: {
-            menuWindow.visible = false
-        }
+        sequence: "Escape"
+        onActivated: menuRoot.closeRequested()
     }
-    
+
     QsMenuOpener {
         id: menuOpener
-        menu: menuWindow.activeItem ? menuWindow.activeItem.menu : null
+        menu: menuRoot.activeItem ? menuRoot.activeItem.menu : null
     }
 
-    Rectangle {
-        anchors.fill: parent
-        color: Colors.background
-        border.color: Colors.border
-        border.width: 2
-        radius: 5
-        // Grow exactly from the top-right where it connects to the bar
-        transformOrigin: Item.TopRight
-        
-        scale: menuWindow.visible ? 1.0 : 0.85
-        opacity: menuWindow.visible ? 1.0 : 0.0
-        Behavior on scale {
-            NumberAnimation { duration: 200; easing.type: Easing.OutBack }
-        }
-        Behavior on opacity {
-            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-        }
-        ColumnLayout {
-            id: menuLayout
-            anchors.fill: parent
-            anchors.margins: 6
-            spacing: 2
-            
-            Repeater {
-                model: menuOpener.children ? menuOpener.children.values : []
-                
-                delegate: ColumnLayout {
-                    required property var modelData
+    ColumnLayout {
+        id: menuLayout
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.margins: 6
+        spacing: 2
+
+        Repeater {
+            model: menuOpener.children ? menuOpener.children.values : []
+
+            delegate: ColumnLayout {
+                id: topDelegate
+                required property var modelData
+                Layout.fillWidth: true
+                spacing: 2
+                property bool submenuExpanded: false
+                property string cleanText: modelData.text ? modelData.text.replace(/&/g, "") : ""
+
+                // --- Divider Line ---
+                Rectangle {
                     Layout.fillWidth: true
-                    spacing: 2
-                    property bool submenuExpanded: false
+                    implicitHeight: 1
+                    opacity: 0.5
+                    color: Colors.border
+                    visible: modelData.isSeparator
+                    Layout.topMargin: 2
+                    Layout.bottomMargin: 2
+                }
 
-                    // --- NEW: Divider Line ---
-                    Rectangle {
-                        Layout.fillWidth: true
-                        implicitHeight: 1
-                        opacity: 0.5
-                        color: Colors.border // Uses your existing border color
-                        visible: modelData.isSeparator 
-                        Layout.topMargin: 2
-                        Layout.bottomMargin: 2
-                    }
+                // --- MAIN MENU ITEM ---
+                Rectangle {
+                    visible: !modelData.isSeparator
+                    Layout.fillWidth: true
+                    implicitHeight: 24
+                    implicitWidth: Math.max(160, menuContentRow.implicitWidth + 16)
+                    color: itemMouseArea.containsMouse ? Colors.workspaceactive : "transparent"
+                    radius: 3
 
-                    // --- MAIN MENU ITEM ---
-                    Rectangle {
-                        visible: !modelData.isSeparator // Hide normal item if it's a separator
-                        Layout.fillWidth: true
-                        implicitHeight: 24
-                        implicitWidth: Math.max(160, menuContentRow.implicitWidth + 16)
-                        color: itemMouseArea.containsMouse ? Colors.workspaceactive : "transparent"
-                        radius: 3
-                        property string cleanText: modelData.text ? modelData.text.replace(/&/g, "") : ""
-                        
-                        RowLayout {
-                            id: menuContentRow
-                            anchors.fill: parent
-                            anchors.leftMargin: 8
-                            anchors.rightMargin: 8
-                            spacing: 8
-                            opacity: (modelData.enabled !== undefined && !modelData.enabled) ? 0.5 : 1.0
-                            
-                            Text {
-                                text: "✓"
-                                color: Colors.text
-                                font.pixelSize: 11
-                                visible: modelData.checked || false
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                text: parent.parent.cleanText
-                                color: Colors.text
-                                font.pixelSize: 11
-                            }
-                            Text {
-                                visible: modelData.hasChildren || false
-                                text: submenuExpanded ? "▾" : "▸"
-                                color: Colors.text
-                                font.pixelSize: 10
-                            }
+                    RowLayout {
+                        id: menuContentRow
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 8
+                        opacity: (modelData.enabled !== undefined && !modelData.enabled) ? 0.5 : 1.0
+
+                        Text {
+                            text: "✓"
+                            color: Colors.text
+                            font.pixelSize: 11
+                            visible: modelData.checked || false
                         }
-
-                        MouseArea {
-                            id: itemMouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            enabled: modelData.enabled !== undefined ? modelData.enabled : true
-                            
-                            onClicked: {
-                                if (modelData.hasChildren) {
-                                    submenuExpanded = !submenuExpanded;
-                                } else if (modelData.enabled !== false) {
-                                    if (modelData.triggered) modelData.triggered();
-                                    else if (modelData.activate) modelData.activate();
-                                    menuWindow.visible = false;
-                                }
-                            }
+                        Text {
+                            Layout.fillWidth: true
+                            text: topDelegate.cleanText
+                            color: Colors.text
+                            font.pixelSize: 11
+                        }
+                        Text {
+                            visible: modelData.hasChildren || false
+                            text: topDelegate.submenuExpanded ? "▾" : "▸"
+                            color: Colors.text
+                            font.pixelSize: 10
                         }
                     }
 
-                    // --- Submenu Container ---
-                    ColumnLayout {
-                        id: submenuContainer
-                        visible: parent.submenuExpanded && (modelData.hasChildren || false)
+                    MouseArea {
+                        id: itemMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        enabled: modelData.enabled !== undefined ? modelData.enabled : true
+
+                        onClicked: {
+                            if (modelData.hasChildren) {
+                                topDelegate.submenuExpanded = !topDelegate.submenuExpanded;
+                            } else if (modelData.enabled !== false) {
+                                if (modelData.triggered) modelData.triggered();
+                                else if (modelData.activate) modelData.activate();
+                                menuRoot.closeRequested();
+                            }
+                        }
+                    }
+                }
+
+                // --- Submenu Container: lazily loaded ---
+                // Loader only instantiates QsMenuOpener (and its D-Bus menu query)
+                // once the user actually expands this item, instead of eagerly
+                // for every item-with-children when the parent menu opens.
+                Loader {
+                    Layout.fillWidth: true
+                    active: topDelegate.submenuExpanded && (modelData.hasChildren || false)
+                    visible: active
+
+                    sourceComponent: ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 2
-                        
+
                         QsMenuOpener {
                             id: subMenuOpener
                             menu: modelData.hasChildren ? modelData : null
@@ -155,14 +128,13 @@ PopupWindow {
 
                         Repeater {
                             model: subMenuOpener.children ? subMenuOpener.children.values : []
-                            
-                            // Changed delegate to ColumnLayout to support dividers here too
+
                             delegate: ColumnLayout {
                                 required property var modelData
                                 Layout.fillWidth: true
                                 spacing: 2
-                                
-                                // --- NEW: Submenu Divider Line ---
+                                property string cleanText: modelData.text ? modelData.text.replace(/&/g, "") : ""
+
                                 Rectangle {
                                     Layout.fillWidth: true
                                     implicitHeight: 1
@@ -173,22 +145,21 @@ PopupWindow {
                                     Layout.bottomMargin: 2
                                 }
 
-                                // --- SUBMENU ITEM ---
                                 Rectangle {
+                                    id: subItemRect
                                     visible: !modelData.isSeparator
                                     Layout.fillWidth: true
                                     implicitHeight: 24
                                     implicitWidth: Math.max(160, subMenuText.implicitWidth + 36)
-                                    color: subItemMouseArea.containsMouse ? "#1d3631" : "transparent"
+                                    color: subItemMouseArea.containsMouse ? Colors.workspaceactive : "transparent"
                                     radius: 3
-                                    property string cleanText: modelData.text ? modelData.text.replace(/&/g, "") : ""
 
                                     Text {
                                         id: subMenuText
                                         anchors.left: parent.left
-                                        anchors.leftMargin: 20 
+                                        anchors.leftMargin: 20
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: parent.cleanText
+                                        text: subItemRect.parent.cleanText
                                         color: Colors.text
                                         font.pixelSize: 11
                                     }
@@ -200,7 +171,7 @@ PopupWindow {
                                         onClicked: {
                                             if (modelData.triggered) modelData.triggered();
                                             else if (modelData.activate) modelData.activate();
-                                            menuWindow.visible = false; 
+                                            menuRoot.closeRequested();
                                         }
                                     }
                                 }
@@ -209,16 +180,6 @@ PopupWindow {
                     }
                 }
             }
-        }
-    }
-
-    function toggleMenu(trayItem, globalX) {
-        if (menuWindow.visible && menuWindow.activeItem === trayItem) {
-            menuWindow.visible = false;
-        } else {
-            menuWindow.activeItem = trayItem;
-            menuWindow.targetX = globalX;
-            menuWindow.visible = true;
         }
     }
 }

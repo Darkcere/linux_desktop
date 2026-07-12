@@ -5,7 +5,7 @@ import "AudioService.qml"
 
 PanelWindow {
     id: osdWindow
-    
+    mask: Region { }
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Ignore
     
@@ -18,33 +18,42 @@ PanelWindow {
 
     property bool isMicEvent: displayMicMuted
     property bool timerActive: false
+    property bool osdReady: false   // guards against the initial async AudioService connection
 
     property bool showOSD: displayMicMuted || timerActive
     visible: showOSD
 
-    property real displayVolume: AudioService.sinkVol
-    property bool displayMuted: AudioService.sinkMuted
-    property bool displayMicMuted: AudioService.micMuted
+    property real displayVolume: AudioService.sink?.audio?.volume ?? 0
+    property bool displayMuted: AudioService.sink?.audio?.muted ?? false
+    property bool displayMicMuted: AudioService.source?.audio?.muted ?? false
 
-    // OPTIMIZATION 1: Cache complex color calculations
-    // Evaluates once instead of every time displayMicMuted toggles
     readonly property color colorMutedBorder: Qt.rgba(Colors.border.r, Colors.border.g, Colors.border.b, 0.3)
-    readonly property color colorTransparent: Qt.rgba(0, 0, 0, 0)
-    
-    Connections {
-        target: AudioService
-        
-        // OPTIMIZATION 2: Omit unused arguments (volume, muted, node)
-        // Prevents the JS engine from needlessly allocating variables on every signal pulse
-        function onVolumeChanged() {
-            osdWindow.isMicEvent = false 
-            osdWindow.triggerOSD()
-        }
-        
-        function onMicVolumeChanged() {
-            osdWindow.isMicEvent = true
-            osdWindow.triggerOSD()
-        }
+
+    onDisplayVolumeChanged: {
+        if (!osdReady) return
+        osdWindow.isMicEvent = false
+        osdWindow.triggerOSD()
+    }
+
+    onDisplayMutedChanged: {
+        if (!osdReady) return
+        osdWindow.isMicEvent = false
+        osdWindow.triggerOSD()
+    }
+
+    onDisplayMicMutedChanged: {
+        if (!osdReady) return
+        osdWindow.isMicEvent = true
+        osdWindow.triggerOSD()
+    }
+
+    Component.onCompleted: readyTimer.start()
+
+    Timer {
+        id: readyTimer
+        interval: 800   // long enough for AudioService.sink/source to attach
+        repeat: false
+        onTriggered: osdWindow.osdReady = true
     }
 
     function triggerOSD() {
@@ -74,7 +83,6 @@ PanelWindow {
             NumberAnimation { duration: 150; easing.type: Easing.OutExpo } 
         }
 
-        // Uses cached properties
         color: '#040e0d'
         opacity: displayMicMuted ? 0.8 : 0.9
         border.color: osdWindow.displayMicMuted ? osdWindow.colorMutedBorder : Colors.border
@@ -112,7 +120,6 @@ PanelWindow {
                 color: Colors.background
                 
                 Rectangle {
-                    // OPTIMIZATION 3: Ensure parent width is resolved via anchors before calculation
                     width: osdWindow.displayMuted ? 0 : (parent.width * osdWindow.displayVolume)
                     height: parent.height
                     radius: 4
@@ -126,7 +133,6 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.rightMargin: 12
                 anchors.verticalCenter: parent.verticalCenter
-                // OPTIMIZATION 4: Kept binding minimal.
                 text: Math.round(osdWindow.displayVolume * 100) + "%"
                 color: Colors.text
                 font.pixelSize: 12

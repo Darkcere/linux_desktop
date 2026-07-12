@@ -8,6 +8,10 @@ PopupWindow {
     property bool active: false
     property int delay: 300
     property int topMargin: 5 
+    
+    property int leftMargin: 0
+
+    
     property Item targetItem: null
 
     // Explicit dimensions are safer for Wayland compositor buffers
@@ -19,7 +23,10 @@ PopupWindow {
         item: root.targetItem
         edges: Edges.Bottom
         gravity: Edges.Bottom
-        margins { top: root.topMargin }
+        margins { 
+            top: root.topMargin 
+            left: root.leftMargin 
+        }
     }
 
     // --- 1. The Spawn Sequence ---

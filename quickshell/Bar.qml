@@ -5,10 +5,10 @@ import Quickshell.Wayland
 PanelWindow {
     id: mainBarWindow 
     WlrLayershell.layer: WlrLayer.Top
-    
+    property var menuHandler
     property QtObject globalTrayMenu
     property bool isDropdownOpen: false
-    property int dropdownWidth: 600
+    property int dropdownWidth: 0
     
     signal toggleLauncherRequested()
     
@@ -29,13 +29,14 @@ PanelWindow {
 
     Rectangle {
         id: barVisuals
-        anchors.centerIn: parent
         implicitHeight: parent.height
+        anchors.verticalCenter: parent.verticalCenter
         
-        // Dynamically match the width of whichever dropdown is open
+        // Morph to the right for both tray AND audio
+        anchors.horizontalCenter: (menuHandler && (menuHandler.lastActiveView === "tray" || menuHandler.lastActiveView === "audio")) ? undefined : parent.horizontalCenter
+        anchors.right: (menuHandler && (menuHandler.lastActiveView === "tray" || menuHandler.lastActiveView === "audio")) ? parent.right : undefined
+        
         width: mainBarWindow.isDropdownOpen ? mainBarWindow.dropdownWidth : mainBarWindow.width
-        
-        // 🚀 THE COMPLEMENT FIX: Match the dropdown's 12px radius so the outer corners align perfectly!
         radius: mainBarWindow.isDropdownOpen ? 12 : 5
         
         color: Colors.background
@@ -43,52 +44,64 @@ PanelWindow {
         border.width: 2
         clip: true 
 
-        // Smooth animations for the sliding morph effect
         Behavior on width { 
-            NumberAnimation { duration: 300; easing.type: Easing.OutQuart } 
+            NumberAnimation { 
+                duration: menuHandler ? menuHandler.morphSpeed : 300 
+                easing.type: Easing.OutQuart 
+            } 
         }
         Behavior on radius { 
-            NumberAnimation { duration: 200; easing.type: Easing.OutQuart } 
+            NumberAnimation { 
+                duration: menuHandler ? menuHandler.morphSpeed : 200 
+                easing.type: Easing.OutQuart 
+            } 
         }
 
-        // --- 🚀 THE SQUARING OFF TRICK ---
-        // This covers the bottom curved corners when the bar is open.
-        // It forces the bottom to be a perfectly flat line so it seamlessly merges with the dropdown.
         Rectangle {
             anchors.bottom: parent.bottom
             anchors.left: parent.left
             anchors.right: parent.right
-            height: 12 // Exactly matches the radius to hide the curve
+            height: 12 
             color: Colors.background
             opacity: mainBarWindow.isDropdownOpen ? 1 : 0
             
-            // Draw straight borders straight down the sides to replace the curved ones
+            visible: opacity > 0
+            
             Rectangle { anchors.left: parent.left; width: 2; height: parent.height; color: Colors.border }
             Rectangle { anchors.right: parent.right; width: 2; height: parent.height; color: Colors.border }
             
-            Behavior on opacity { NumberAnimation { duration: 200 } }
+            Behavior on opacity { 
+                NumberAnimation { 
+                    duration: menuHandler ? (menuHandler.morphSpeed / 2) : 100 
+                } 
+            }
         }
 
         Item {
             id: innerContent
-            // 🚀 VISIBILITY FIX: Lock the content wrapper to the full screen width.
-            // This ensures your clock and modules stay perfectly centered and visible,
-            // and the sides of the bar look like they are sliding inward to frame them!
+            x: -barVisuals.x 
+            y: 0
             width: mainBarWindow.width
             implicitHeight: mainBarWindow.height
-            anchors.centerIn: parent
 
             Item {
                 anchors.fill: parent
                 anchors.leftMargin: 9
                 anchors.rightMargin: 9
-
+                
+                // --- LEFT ROW ---
                 Row {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 8 
-
+                    
+                    // Hide when tray or audio is open
+                    opacity: menuHandler.activeView ? 0 : 1
+                    visible: opacity > 0 
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                    
                     Text {
+                        id: archlogo
                         text: "󰣇"
                         color: Colors.text
                         font.pixelSize: 14
@@ -96,49 +109,63 @@ PanelWindow {
                         Behavior on color { ColorAnimation { duration: 150 } }
                         
                         MouseArea {
+                            id: archMouseArea
                             anchors.fill: parent
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: mainBarWindow.toggleLauncherRequested()
                         }
                     }
                     
-                    Loader { 
-                        active: true 
-                        sourceComponent: workspacesComp 
-                        anchors.verticalCenter: parent.verticalCenter 
-                    }
+                    Workspaces { anchors.verticalCenter: parent.verticalCenter }
                 }
 
+                // --- CENTER ROW ---
                 Row {
                     anchors.centerIn: parent
                     spacing: 5 
-                    Loader { active: true; sourceComponent: clockComp; anchors.verticalCenter: parent.verticalCenter }
-                    Loader { active: true; sourceComponent: mediaPlayerComp; anchors.verticalCenter: parent.verticalCenter }
+                    
+                    // Hide when tray or audio is open
+                    opacity: (menuHandler && (menuHandler.activeView === "tray" || menuHandler.activeView === "audio")) ? 0 : 1
+                    visible: opacity > 0 
+                    Behavior on opacity { NumberAnimation { duration: 150 } }
+                    
+                    Clock { z: -1; anchors.verticalCenter: parent.verticalCenter }
+                    Mediaplayer { z: 10; anchors.verticalCenter: parent.verticalCenter }
                 }
 
+                // --- RIGHT ROW ---
                 Row {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 8
                     
-                    Loader { 
-                        active: true
-                        sourceComponent: audioComp 
-                        anchors.verticalCenter: parent.verticalCenter 
+                    AudioModule {
+                        anchors.verticalCenter: parent.verticalCenter
+                        // Fade out the audio button when the tray is open (so it doesn't overlap)
+                        opacity: (menuHandler && menuHandler.activeView && menuHandler.activeView !== "audio") ? 0 : 1
+                        visible: opacity > 0
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
                     }
-                    Loader { 
-                        active: true
-                        sourceComponent: trayComp 
-                        anchors.verticalCenter: parent.verticalCenter 
+                    
+                    Tray { 
+                        anchors.verticalCenter: parent.verticalCenter
+                        // Fade out the tray when the audio menu is open
+                        opacity: (menuHandler && menuHandler.activeView && menuHandler.activeView !== "tray") ? 0 : 1
+                        visible: opacity > 0
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                        menuHandler: mainBarWindow.menuHandler
                     }
                 }
             }
         }
     }
-
-    Component { id: workspacesComp; Workspaces {} }
-    Component { id: clockComp; Clock { z: -1 } }
-    Component { id: mediaPlayerComp; Mediaplayer { z: 10 } }
-    Component { id: audioComp; AudioModule {} }
-    Component { id: trayComp; Tray { menuHandler: mainBarWindow.globalTrayMenu } }
+    
+    BarToolTip {
+        targetItem: archlogo
+        active: archMouseArea.containsMouse
+        text: "Open Launcher"
+        topMargin: 20
+        leftMargin: 42
+    }
 }

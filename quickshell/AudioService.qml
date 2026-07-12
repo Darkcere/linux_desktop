@@ -13,38 +13,24 @@ Singleton {
     property PwNode source: Pipewire.defaultAudioSource
     readonly property real hardMaxValue: 2.00
 
-    // --- 1. THE OPTIMIZATION: NATIVE STATE TRACKING ---
-    // These properties run purely in C++ and won't break if a headset is hot-plugged
-    readonly property real sinkVol: sink?.audio?.volume ?? 0
-    readonly property bool sinkMuted: sink?.audio?.muted ?? false
-    
-    readonly property real micVol: source?.audio?.volume ?? 0
-    readonly property bool micMuted: source?.audio?.muted ?? false
+    // --- OPTIMIZATION 1: Deleted manual state trackers and signals ---
+    // Your AudioModule UI already binds directly to `sink.audio.volume`.
+    // QML handles those updates natively in C++, making these JS signals redundant.
 
-    // --- 2. AUTOMATIC SIGNAL EMITTERS ---
-    // This entirely replaces the heavy 'Connections' blocks
-    onSinkVolChanged: if (sink?.ready) volumeChanged(sinkVol, sinkMuted, sink)
-    onSinkMutedChanged: if (sink?.ready) volumeChanged(sinkVol, sinkMuted, sink)
-
-    onMicVolChanged: if (source?.ready) micVolumeChanged(micVol, micMuted, source)
-    onMicMutedChanged: if (source?.ready) micVolumeChanged(micVol, micMuted, source)
-
-    // --- 3. PROTECTION SETTINGS ---
+    // --- PROTECTION SETTINGS ---
     property bool protectionEnabled: true
     readonly property real maxVolumeJump: 0.15 
     property bool protectionTriggered: false
 
     signal sinkProtectionTriggered(string reason)
-    signal volumeChanged(real volume, bool muted, var node)
-    signal micVolumeChanged(real volume, bool muted, var node)
 
     PwObjectTracker {
         objects: [sink, source]
     }
 
-    // Note: I kept the 'node' parameter so we don't break the function call in your AudioModule.qml, 
-    // even though the function doesn't actually need to use it!
-    function protectedSetVolume(node, targetVolume: real, currentVolume: real) {
+    // OPTIMIZATION 2: Replaced 'var' with 'PwNode' for the node parameter
+    // Because you used `pragma ComponentBehavior: Bound`, strong typing makes the function execute faster
+    function protectedSetVolume(node: PwNode, targetVolume: real, currentVolume: real) {
         if (!root.protectionEnabled) return targetVolume;
         const jump = targetVolume - currentVolume;
         

@@ -57,7 +57,13 @@ Item {
                 clipModel.clear();
                 fullClipData = [];
                 
-                if (text.trim() === "") return;
+                if (text.trim() === "") {
+                    // OPTIMIZATION: Reset metadata if empty
+                    clipboardWindow.metaType = "None";
+                    clipboardWindow.metaSize = "0 bytes";
+                    clipboardWindow.loadPreview();
+                    return;
+                }
                 
                 let lines = text.trim().split('\n');
                 for (let i = 0; i < lines.length; i++) {
@@ -66,7 +72,6 @@ Item {
                         let idStr = parts[0];
                         let rawText = parts.slice(1).join('\t');
                         
-                        // cliphist denotes images with [[ binary data ... ]]
                         let isImg = rawText.includes("[[ binary data");
                         let displayTitle = isImg ? "Image Data" : rawText.trim().substring(0, 120).replace(/\n/g, " ");
                         
@@ -124,8 +129,10 @@ Item {
                     previewTextScroll.visible = true;
                     clipboardWindow.metaSize = text.length + " chars";
                 } else {
-                    // It's an image. Append timestamp to force QML to bypass cache
-                    previewImage.source = "file:///tmp/qs_clip_preview.png?t=" + Date.now();
+                    // OPTIMIZATION: Decode Base64 string directly into QtQuick memory
+                    // We strip newlines from the bash base64 output just to be safe
+                    let cleanB64 = text.replace(/\n/g, "");
+                    previewImage.source = "data:image/png;base64," + cleanB64;
                     previewTextScroll.visible = false;
                     previewImage.visible = true;
                 }
@@ -138,6 +145,9 @@ Item {
             previewText.text = "No item selected.";
             previewImage.visible = false;
             previewTextScroll.visible = true;
+            // Reset metadata
+            clipboardWindow.metaType = "None";
+            clipboardWindow.metaSize = "0 bytes";
             return;
         }
 
@@ -145,13 +155,14 @@ Item {
         
         if (item.isImage) {
             clipboardWindow.metaType = "Image";
-            // Extract the size string if possible from "[[ binary data 45 KB jpg ]]"
             let match = item.rawText.match(/\[\[ binary data (.*?) \]\]/);
             clipboardWindow.metaSize = match ? match[1] : "Unknown size";
             
             previewProcess.fetchingImage = true;
-            // Decode straight to a temp file, then echo a space so StdioCollector fires
-            previewProcess.command = ["bash", "-c", "cliphist decode " + item.clipId + " > /tmp/qs_clip_preview.png && echo ' '"];
+            
+            // OPTIMIZATION: Pipe to base64 instead of writing to disk!
+            // -w 0 ensures base64 output has no line wrapping
+            previewProcess.command = ["bash", "-c", "cliphist decode " + item.clipId + " | base64 -w 0"];
         } else {
             clipboardWindow.metaType = "Text";
             previewProcess.fetchingImage = false;
@@ -163,11 +174,20 @@ Item {
 
     function copyClip(idStr) {
         if (!idStr) return;
-        let bashCmd = "cliphist decode " + idStr + " | wl-copy";
+        let bashCmd = "cliphist decode " + idStr + " | wl-copy && sleep 0.15 && wtype -M ctrl -k v -m ctrl";
         Quickshell.execDetached({ command: ["bash", "-c", bashCmd] });
         clipboardWindow.closeRequested();
     }
-
+    
+    function clearClipboard() {
+        Quickshell.execDetached({ command: ["bash", "-c", "cliphist wipe"] });
+        clipModel.clear();
+        fullClipData = [];
+        selectedIndex = -1;
+        loadPreview();
+        searchInput.forceActiveFocus();
+    }
+    
     // --- INJECTED UI ---
     Row {
         anchors.fill: parent
@@ -235,7 +255,7 @@ Item {
             ListView {
                 id: clipList
                 width: parent.width
-                height: parent.height - 50
+                height: parent.height - 90
                 clip: true
                 model: clipModel
                 currentIndex: clipboardWindow.selectedIndex
@@ -276,7 +296,7 @@ Item {
                             // TEXT
                             Column {
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - 56 // Adjust for icon and spacing
+                                width: parent.width - 56
                                 spacing: 2
                                 
                                 Text {
@@ -303,10 +323,38 @@ Item {
                             hoverEnabled: true
                             onClicked: {
                                 clipboardWindow.selectedIndex = index;
-                                // Double click to copy
                                 clipboardWindow.copyClip(model.clipId);
                             }
                         }
+                    }
+                }
+            }
+            // --- BOTTOM ACTIONS ---
+            Row {
+                width: parent.width
+                height: 30
+                spacing: 10
+
+                // Clear All Button
+                Rectangle {
+                    width: (parent.width - 10)
+                    height: parent.height
+                    color: clearMouseArea.containsMouse ? Qt.rgba(Colors.workspaceurgent.r, Colors.workspaceurgent.g, Colors.workspaceurgent.b, 0.15) : "transparent"
+                    border.color: Colors.border
+                    border.width: 1
+                    radius: 6
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Clear All"
+                        color: Colors.text
+                        font.pixelSize: 12
+                    }
+                    MouseArea {
+                        id: clearMouseArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: clipboardWindow.clearClipboard()
                     }
                 }
             }
@@ -359,7 +407,10 @@ Item {
                         anchors.margins: 10
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
-                        cache: false
+                        // OPTIMIZATION: Restrict VRAM usage for giant screenshots
+                        sourceSize: Qt.size(400, 400)
+                        
+                        // NOTE: cache: false is no longer needed since we aren't bypassing URL caches
                         visible: false
                     }
                 }
@@ -398,7 +449,7 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Enter to Copy"
+                        text: "Enter to Copy and Paste"
                         color: Colors.workspaceactive
                         font.bold: true
                         font.pixelSize: 12

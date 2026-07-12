@@ -22,8 +22,11 @@ Item {
         }
     }
 
+    // --- REFRESH APPS ON OPEN ---
     onIsOpenChanged: {
         if (isOpen) {
+            // OPTIMIZATION: Removed fetchAppsProcess.running = true from here.
+            // Spawning a whole python process on every toggle kills CPU.
             filterApps("")
             focusTimer.start()
         }
@@ -32,6 +35,16 @@ Item {
     Shortcut {
         sequence: "Escape"
         onActivated: launcherWindow.closeRequested()
+    }
+
+    // OPTIMIZATION: Added a manual refresh shortcut if you install something new
+    Shortcut {
+        sequence: "Ctrl+R"
+        enabled: launcherWindow.isOpen
+        onActivated: {
+            console.log("QUICKSHELL: Manually re-scanning application entries...")
+            fetchAppsProcess.running = true
+        }
     }
 
     property var allAppsData: [] 
@@ -109,7 +122,7 @@ Item {
                 try {
                     launcherWindow.allAppsData = JSON.parse(text);
                     launcherWindow.sortApps(); 
-                    filterApps("");
+                    filterApps(searchInput.text);
                 } catch(e) {
                     console.log("Failed to parse apps: " + e);
                 }
@@ -147,7 +160,6 @@ Item {
         anchors.margins: 20
         spacing: 15
 
-        // --- MATCHING SEARCH BAR STYLE ---
         Rectangle {
             width: parent.width
             height: 45
@@ -161,13 +173,12 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 12
                 verticalAlignment: TextInput.AlignVCenter
-                color: Colors.workspaceactive // Changed to match wallpaper picker
+                color: Colors.workspaceactive 
                 font.pixelSize: 16
                 focus: true 
                 
-                // --- PROPER PLACEHOLDER ---
                 Text {
-                    text: "Search Apps..."
+                    text: "Search Apps... (Ctrl+R to refresh cache)"
                     color: Colors.workspaceactive
                     opacity: 0.4
                     font.pixelSize: 16
@@ -241,7 +252,6 @@ Item {
                     anchors.leftMargin: 5
                     anchors.rightMargin: 5
                     
-                    // --- HIGH CONTRAST SELECTION HIGHLIGHT ---
                     color: (appMouseArea.containsMouse || appsList.currentIndex === index) ? Colors.workspaceactive : "transparent"
                     radius: 8
                     
@@ -258,6 +268,11 @@ Item {
                             anchors.fill: parent
                             source: model.icon ? ("image://icon/" + model.icon) : ""
                             fillMode: Image.PreserveAspectFit
+                            
+                            // OPTIMIZATION: Prevents huge master system icons from consuming massive uncompressed RAM/VRAM
+                            sourceSize.width: 36
+                            sourceSize.height: 36
+                            
                             onStatusChanged: { if (status === Image.Error) visible = false; }
                         }
 
@@ -270,7 +285,6 @@ Item {
                             Text {
                                 anchors.centerIn: parent
                                 text: model.name ? model.name[0] : "?" 
-                                // --- INVERT FALLBACK TEXT ON HOVER ---
                                 color: (appMouseArea.containsMouse || appsList.currentIndex === index) ? Colors.background : Colors.text
                                 font.pixelSize: 18
                                 font.bold: true
@@ -280,7 +294,6 @@ Item {
 
                     Text {
                         text: model.name
-                        // --- INVERT LIST TEXT ON HOVER ---
                         color: (appMouseArea.containsMouse || appsList.currentIndex === index) ? Colors.background : Colors.text
                         font.pixelSize: 15
                         font.bold: (appMouseArea.containsMouse || appsList.currentIndex === index)

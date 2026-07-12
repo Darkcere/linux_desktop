@@ -6,7 +6,6 @@ import QtQuick
 ShellRoot {
     id: root
 
-
     // ... (Your other shortcuts) ...
     GlobalShortcut {
         name: "toggleTools"
@@ -16,9 +15,6 @@ ShellRoot {
         name: "togglePowerMenu"
         onPressed: dropdownManager.togglePowerMenu()
     }
-    // ... existing shortcuts ...
-
-    // Add the new shortcut
     GlobalShortcut {
         name: "toggleClipboard"
         onPressed: dropdownManager.toggleClipboard()
@@ -27,10 +23,13 @@ ShellRoot {
         name: "toggleLauncher" 
         onPressed: dropdownManager.toggleApps()
     }
-
     GlobalShortcut {
         name: "toggleWallpaperPicker"
         onPressed: dropdownManager.openWallpaperPicker() 
+    }
+    GlobalShortcut {
+        name: "toggleAudioMenu"
+        onPressed: dropdownManager.toggleAudio() 
     }
     
     Connections {
@@ -42,26 +41,21 @@ ShellRoot {
     
     Bar {
         id: mainBarWindow
-        globalTrayMenu: globalTrayMenu
+        menuHandler: dropdownManager 
         
-        // Pass the generic states from the Manager
-        isDropdownOpen: dropdownManager.isOpen
+        // Revert to this!
+        isDropdownOpen: dropdownManager.isOpen 
+        
         dropdownWidth: dropdownManager.currentDropWidth
-        
         onToggleLauncherRequested: dropdownManager.toggleApps()
     }
     
     // --- THE UNIFIED DROPDOWN MANAGER ---
     DropdownWindow {
         id: dropdownManager
-        isBarVisible: mainBarWindow.visible && !(ToplevelManager.activeToplevel && ToplevelManager.activeToplevel.fullscreen)
+        isBarVisible: mainBarWindow.visible && !Hyprland.focusedWorkspace.hasFullscreen
     } 
-    
-    TrayMenu {
-        id: globalTrayMenu
-        parentBarWindow: mainBarWindow
-    }
-
+    // remember to not load when shell starts
     Osd {
         id: volumeOSD
     }
@@ -95,7 +89,6 @@ ShellRoot {
                 }
             }
 
-            // ADD THIS NEW FUNCTION
             function applyColors() {
                 let colorCmd = `matugen --source-color-index 0 image "$HOME/.current.wall" -t scheme-content && sh "$HOME/.config/hypr/scripts/colors_mqtt.sh"`;
                 Quickshell.execDetached({ command: ["bash", "-c", colorCmd] });
@@ -106,14 +99,18 @@ ShellRoot {
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
-                cache: false 
+                
+                // OPTIMIZATION: Limits RAM usage to exactly what the screen needs
+                sourceSize.width: parent.width
+                sourceSize.height: parent.height
+                
                 source: "file:///home/duarte/.current.wall"
                 
                 onStatusChanged: {
                     if (status === Image.Ready && wallpaperContainer.useFront) {
                         console.log("QUICKSHELL: Back image ready, crossfading...")
                         wallpaperContainer.useFront = false
-                        wallpaperContainer.applyColors() // TRIGGER COLORS HERE
+                        wallpaperContainer.applyColors() 
                     }
                 }
             }
@@ -123,19 +120,36 @@ ShellRoot {
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
-                cache: false
+                
+                // OPTIMIZATION: Limits RAM usage
+                sourceSize.width: parent.width
+                sourceSize.height: parent.height
+                
                 source: ""
                 opacity: wallpaperContainer.useFront ? 1 : 0
                 
                 Behavior on opacity {
-                    NumberAnimation { duration: 500; easing.type: Easing.InOutQuad }
+                    NumberAnimation { 
+                        id: fadeAnim
+                        duration: 500; 
+                        easing.type: Easing.InOutQuad 
+                    }
+                }
+
+                // OPTIMIZATION: Free the hidden image from VRAM once the fade is done
+                onOpacityChanged: {
+                    if (opacity === 1 && !fadeAnim.running) {
+                        backImage.source = "" 
+                    } else if (opacity === 0 && !fadeAnim.running) {
+                        frontImage.source = ""
+                    }
                 }
 
                 onStatusChanged: {
                     if (status === Image.Ready && !wallpaperContainer.useFront && source !== "") {
                         console.log("QUICKSHELL: Front image ready, crossfading...")
                         wallpaperContainer.useFront = true
-                        wallpaperContainer.applyColors() // TRIGGER COLORS HERE
+                        wallpaperContainer.applyColors() 
                     }
                 }
             }
