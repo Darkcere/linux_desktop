@@ -24,12 +24,12 @@ toggle_gamemode() {
             keyword general:border_size 1;\
             keyword decoration:rounding 0;\
             "
-        swaync-client -dn
+        hyprctl dispatch global quickshell:toggleDnd
         powerprofilesctl set performance
         exit
     fi
     hyprctl reload
-    swaync-client -df
+    hyprctl dispatch global quickshell:toggleDnd
     powerprofilesctl set balanced
 }
 

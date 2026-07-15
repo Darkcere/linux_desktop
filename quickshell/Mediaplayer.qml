@@ -182,6 +182,7 @@ Rectangle {
         
         Text {
             id: mediaTitle
+            visible: root.title
             HoverHandler { id: mediaHover }
             Layout.maximumWidth: 200
             text: root.artist.length > 0 ? root.title + " • " + root.artist : root.title

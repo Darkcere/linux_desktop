@@ -15,10 +15,10 @@ output_path = "~/.config/Ax-Shell/config/hypr/colors.conf"
 #input_path = './templates/vicinae.toml'
 #output_path = '~/.local/share/vicinae/themes/matugen.toml'
 #post_hook = 'vicinae theme set matugen'
-[templates.swaync]                                                                                                                                                             
-input_path = "~/.config/Ax-Shell/config/matugen/templates/swaync.css"                                                                                                            
-output_path = "~/.config/swaync/style.css"
-post_hook = 'swaync-client -rs'
+#[templates.swaync]                                                                                                                                                             
+#input_path = "~/.config/Ax-Shell/config/matugen/templates/swaync.css"                                                                                                            
+#output_path = "~/.config/swaync/style.css"
+#post_hook = 'swaync-client -rs'
 [templates.qt6ct]
 input_path = "./templates/qt6ct.conf"
 output_path = "/home/duarte/.config/qt6ct/colors/matugen.conf"

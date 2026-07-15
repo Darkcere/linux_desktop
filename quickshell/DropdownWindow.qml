@@ -4,12 +4,14 @@ import Quickshell.Wayland
 
 PanelWindow {
     id: root
-    
+    property var notifServer
+    property bool dndEnabled: false
+    signal toggleDndRequested()
     // --- STATE MANAGEMENT ---
     property string activeView: ""
     property bool isOpen: activeView !== ""
     property string lastActiveView: ""
-    property bool isBarVisible: true
+    property bool isBarVisible: false
     property var currentTrayItem: null
     // --- DYNAMIC MORPHING DIMENSIONS ---
     property int currentDropWidth: {
@@ -18,6 +20,7 @@ PanelWindow {
         if (lastActiveView === "clipboard") return 950;
         if (lastActiveView === "powermenu") return 350; 
         if (lastActiveView === "audio") return 450; 
+        if (lastActiveView === "notifications") return 380; // NEW
         return 600; 
     }
     property int currentDropHeight: {
@@ -26,9 +29,10 @@ PanelWindow {
         if (lastActiveView === "tools") return 630;
         if (lastActiveView === "powermenu") return 360; 
         if (lastActiveView === "audio") return 550; 
+        if (lastActiveView === "notifications") return 600; // NEW
         return 450;
     }
-
+    property bool isRightAligned: lastActiveView === "tray" || lastActiveView === "audio" || lastActiveView === "notifications"
     property int morphSpeed: 350
     onActiveViewChanged: {
         if (activeView !== "") {
@@ -40,7 +44,7 @@ PanelWindow {
     onCloseRequested: {
         root.activeView = ""
     }
-
+    function toggleNotifications() { root.activeView = (root.activeView === "notifications") ? "" : "notifications" }
     function toggleTrayMenu(trayItem) {
         if (root.activeView === "tray" && root.currentTrayItem === trayItem) {
             root.closeRequested()
@@ -86,11 +90,11 @@ PanelWindow {
         id: visualBox
         anchors.top: parent.top
         
-        anchors.horizontalCenter: (root.lastActiveView === "tray" || root.lastActiveView === "audio") ? undefined : parent.horizontalCenter
-        anchors.right: (root.lastActiveView === "tray" || root.lastActiveView === "audio") ? parent.right : undefined
-        anchors.rightMargin: (root.lastActiveView === "tray" || root.lastActiveView === "audio") ? 7 : 0 
-        transformOrigin: (root.lastActiveView === "tray" || root.lastActiveView === "audio") ? Item.TopRight : Item.Top
-        
+        anchors.horizontalCenter: root.isRightAligned ? undefined : parent.horizontalCenter
+        anchors.right: root.isRightAligned ? parent.right : undefined
+        anchors.rightMargin: root.isRightAligned ? 7 : 0 
+        transformOrigin: root.isRightAligned ? Item.TopRight : Item.Top
+
         color: Colors.background 
         border.color: Colors.border
         border.width: 2
@@ -206,6 +210,26 @@ PanelWindow {
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
                     sourceComponent: Component {
                         AudioMenu { isOpen: root.activeView === "audio"; onCloseRequested: root.closeRequested() }
+                    }
+                }
+                Loader {
+                    id: notificationsLoader
+                    anchors.fill: parent
+                    
+                    // 💡 ADD THE LAST ACTIVE VIEW CHECK HERE:
+                    active: root.activeView === "notifications" || (root.lastActiveView === "notifications" && visualBox.opacity > 0)
+                    
+                    opacity: root.activeView === "notifications" ? 1 : 0
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
+                    sourceComponent: Component {
+                        NotificationMenu { 
+                            isOpen: root.activeView === "notifications"
+                            server: root.notifServer 
+                            dndEnabled: root.dndEnabled // (Assuming root is your DropdownWindow id)
+                            onToggleDndRequested: root.toggleDndRequested()
+                            onCloseRequested: root.closeRequested() 
+                        }
                     }
                 }
             }

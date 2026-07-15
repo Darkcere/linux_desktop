@@ -10,8 +10,18 @@ PanelWindow {
     property bool isDropdownOpen: false
     property int dropdownWidth: 0
     
+    property bool hasNotifications: false 
+    property bool hasActivePopup: false 
+
+    // 💡 NEW: DND property for the Bar
+    property bool dndEnabled: false
+
     signal toggleLauncherRequested()
     
+    // --- HELPER PROPERTIES FOR CLEANER LOGIC ---
+    property bool isRightAlignedMode: menuHandler && (menuHandler.lastActiveView === "tray" || menuHandler.lastActiveView === "audio" || menuHandler.lastActiveView === "notifications")
+    property bool isRightMenuOpen: menuHandler && (menuHandler.activeView === "tray" || menuHandler.activeView === "audio" || menuHandler.activeView === "notifications")
+
     anchors {
         top: true
         left: true
@@ -19,7 +29,7 @@ PanelWindow {
     }
 
     margins {
-        top: 2
+        top: 5
         left: 7
         right: 7
     }
@@ -32,9 +42,8 @@ PanelWindow {
         implicitHeight: parent.height
         anchors.verticalCenter: parent.verticalCenter
         
-        // Morph to the right for both tray AND audio
-        anchors.horizontalCenter: (menuHandler && (menuHandler.lastActiveView === "tray" || menuHandler.lastActiveView === "audio")) ? undefined : parent.horizontalCenter
-        anchors.right: (menuHandler && (menuHandler.lastActiveView === "tray" || menuHandler.lastActiveView === "audio")) ? parent.right : undefined
+        anchors.horizontalCenter: mainBarWindow.isRightAlignedMode ? undefined : parent.horizontalCenter
+        anchors.right: mainBarWindow.isRightAlignedMode ? parent.right : undefined
         
         width: mainBarWindow.isDropdownOpen ? mainBarWindow.dropdownWidth : mainBarWindow.width
         radius: mainBarWindow.isDropdownOpen ? 12 : 5
@@ -44,37 +53,41 @@ PanelWindow {
         border.width: 2
         clip: true 
 
-        Behavior on width { 
-            NumberAnimation { 
-                duration: menuHandler ? menuHandler.morphSpeed : 300 
-                easing.type: Easing.OutQuart 
-            } 
-        }
-        Behavior on radius { 
-            NumberAnimation { 
-                duration: menuHandler ? menuHandler.morphSpeed : 200 
-                easing.type: Easing.OutQuart 
-            } 
-        }
+        Behavior on width { NumberAnimation { duration: menuHandler ? menuHandler.morphSpeed : 300; easing.type: Easing.OutQuart } }
+        Behavior on radius { NumberAnimation { duration: menuHandler ? menuHandler.morphSpeed : 200; easing.type: Easing.OutQuart } }
 
+        // --- 1. DROPDOWN BRIDGE ---
         Rectangle {
             anchors.bottom: parent.bottom
             anchors.left: parent.left
             anchors.right: parent.right
             height: 12 
             color: Colors.background
-            opacity: mainBarWindow.isDropdownOpen ? 1 : 0
             
+            opacity: mainBarWindow.isDropdownOpen ? 1 : 0 
             visible: opacity > 0
             
             Rectangle { anchors.left: parent.left; width: 2; height: parent.height; color: Colors.border }
             Rectangle { anchors.right: parent.right; width: 2; height: parent.height; color: Colors.border }
             
-            Behavior on opacity { 
-                NumberAnimation { 
-                    duration: menuHandler ? (menuHandler.morphSpeed / 2) : 100 
-                } 
-            }
+            Behavior on opacity { NumberAnimation { duration: menuHandler ? (menuHandler.morphSpeed / 2) : 100 } }
+        }
+
+        // --- 2. NOTIFICATION POPUP BRIDGE ---
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            
+            width: 348
+            height: 12 
+            color: Colors.background
+            
+            opacity: (!mainBarWindow.isDropdownOpen && mainBarWindow.hasActivePopup) ? 1 : 0
+            visible: opacity > 0
+            
+            Rectangle { anchors.right: parent.right; width: 2; height: parent.height; color: Colors.border }
+            
+            Behavior on opacity { NumberAnimation { duration: 150 } }
         }
 
         Item {
@@ -95,8 +108,7 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 8 
                     
-                    // Hide when tray or audio is open
-                    opacity: menuHandler.activeView ? 0 : 1
+                    opacity: menuHandler && menuHandler.activeView ? 0 : 1
                     visible: opacity > 0 
                     Behavior on opacity { NumberAnimation { duration: 150 } }
                     
@@ -125,8 +137,7 @@ PanelWindow {
                     anchors.centerIn: parent
                     spacing: 5 
                     
-                    // Hide when tray or audio is open
-                    opacity: (menuHandler && (menuHandler.activeView === "tray" || menuHandler.activeView === "audio")) ? 0 : 1
+                    opacity: mainBarWindow.isRightMenuOpen ? 0 : 1
                     visible: opacity > 0 
                     Behavior on opacity { NumberAnimation { duration: 150 } }
                     
@@ -138,19 +149,46 @@ PanelWindow {
                 Row {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 8
+                    spacing: 5 
                     
                     AudioModule {
                         anchors.verticalCenter: parent.verticalCenter
-                        // Fade out the audio button when the tray is open (so it doesn't overlap)
                         opacity: (menuHandler && menuHandler.activeView && menuHandler.activeView !== "audio") ? 0 : 1
                         visible: opacity > 0
                         Behavior on opacity { NumberAnimation { duration: 150 } }
                     }
                     
+                    Text {
+                        id: notifIcon
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        // 💡 NEW: Check DND first, then fallback to normal logic
+                        text: mainBarWindow.dndEnabled ? "󰂛" : (mainBarWindow.hasNotifications ? "󰂚" : "󰂜")
+                        
+                        // 💡 Dim the color slightly if DND is active and we aren't hovering
+                        color: (notifMouseArea.containsMouse || (menuHandler && menuHandler.activeView === "notifications")) 
+                               ? Colors.accent 
+                               : (mainBarWindow.dndEnabled ? Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.5) : Colors.text)
+                        
+                        opacity: (menuHandler && menuHandler.activeView && menuHandler.activeView !== "notifications") ? 0 : 1
+                        font.pixelSize: 14
+                        
+                        visible: opacity > 0
+                        
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                        
+                        MouseArea {
+                            id: notifMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: if (menuHandler) menuHandler.toggleNotifications()
+                        }
+                    }
+                    
                     Tray { 
                         anchors.verticalCenter: parent.verticalCenter
-                        // Fade out the tray when the audio menu is open
                         opacity: (menuHandler && menuHandler.activeView && menuHandler.activeView !== "tray") ? 0 : 1
                         visible: opacity > 0
                         Behavior on opacity { NumberAnimation { duration: 150 } }
