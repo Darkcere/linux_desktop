@@ -10,8 +10,8 @@ PanelWindow {
     property bool isDropdownOpen: false
     property int dropdownWidth: 0
     
-    property bool hasNotifications: false 
-    property bool hasActivePopup: false 
+    property bool hasNotifications: NotificationManager.list.length > 0 
+    property bool hasActivePopup: NotificationManager.popupList.length > 0
 
     // 💡 NEW: DND property for the Bar
     property bool dndEnabled: false
@@ -81,11 +81,25 @@ PanelWindow {
             width: 348
             height: 12 
             color: Colors.background
-            
+
             opacity: (!mainBarWindow.isDropdownOpen && mainBarWindow.hasActivePopup) ? 1 : 0
             visible: opacity > 0
             
-            Rectangle { anchors.right: parent.right; width: 2; height: parent.height; color: Colors.border }
+            // ✅ ADDED anchors.bottom: parent.bottom so it pushes down into the corner!
+            Rectangle { 
+                anchors.left: parent.left; 
+                anchors.bottom: parent.bottom; 
+                width: 2; 
+                height: parent.height - 10; 
+                color: Colors.border 
+            }
+            Rectangle { 
+                anchors.right: parent.right; 
+                anchors.bottom: parent.bottom; 
+                width: 2; 
+                height: parent.height; 
+                color: Colors.border 
+            }
             
             Behavior on opacity { NumberAnimation { duration: 150 } }
         }
@@ -157,36 +171,24 @@ PanelWindow {
                         visible: opacity > 0
                         Behavior on opacity { NumberAnimation { duration: 150 } }
                     }
-                    
                     Text {
-                        id: notifIcon
+                        // Replaced the outlined bell with the filled bell ()
+                        text: NotificationManager.silent ? "🔕" : (hasNotifications ? "" : "")
+                        color: hasNotifications ? Colors.text : Colors.text 
+                        font.pixelSize: 14
                         anchors.verticalCenter: parent.verticalCenter
-
-                        // 💡 NEW: Check DND first, then fallback to normal logic
-                        text: mainBarWindow.dndEnabled ? "󰂛" : (mainBarWindow.hasNotifications ? "󰂚" : "󰂜")
-                        
-                        // 💡 Dim the color slightly if DND is active and we aren't hovering
-                        color: (notifMouseArea.containsMouse || (menuHandler && menuHandler.activeView === "notifications")) 
-                               ? Colors.accent 
-                               : (mainBarWindow.dndEnabled ? Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.5) : Colors.text)
                         
                         opacity: (menuHandler && menuHandler.activeView && menuHandler.activeView !== "notifications") ? 0 : 1
-                        font.pixelSize: 14
-                        
                         visible: opacity > 0
-                        
                         Behavior on opacity { NumberAnimation { duration: 150 } }
-                        Behavior on color { ColorAnimation { duration: 150 } }
                         
                         MouseArea {
-                            id: notifMouseArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: if (menuHandler) menuHandler.toggleNotifications()
+                            onClicked: mainBarWindow.menuHandler.toggleNotifications()
                         }
                     }
-                    
                     Tray { 
                         anchors.verticalCenter: parent.verticalCenter
                         opacity: (menuHandler && menuHandler.activeView && menuHandler.activeView !== "tray") ? 0 : 1

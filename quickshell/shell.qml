@@ -5,6 +5,7 @@ import QtQuick
 
 ShellRoot {
     id: root
+    
     Connections {
         target: Hyprland
         function onRawEvent(event) {
@@ -13,6 +14,7 @@ ShellRoot {
             }
         }
     }
+    
     property bool realFullscreen: {
         // 1. First, check if the workspace even reports fullscreen
         let workspaceHasFs = Hyprland.focusedWorkspace?.hasFullscreen ?? false;
@@ -28,12 +30,14 @@ ShellRoot {
         // If it is 1, this returns false.
         return val === 2;
     }
-    property bool dndEnabled: false
+
+    // 💡 NEW: Tracks if a right-side menu is open to push notifications down
+    property bool isRightMenuOpen: dropdownManager.isOpen && 
+                                   (dropdownManager.activeView === "tray" || 
+                                    dropdownManager.activeView === "audio" || 
+                                    dropdownManager.activeView === "notifications")
+
     // ... (Your other shortcuts) ...
-    GlobalShortcut {
-        name: "toggleDnd"
-        onPressed: dndEnabled = !dndEnabled
-    }
     GlobalShortcut {
         name: "toggleTools"
         onPressed: dropdownManager.toggleTools()
@@ -58,36 +62,16 @@ ShellRoot {
         name: "toggleAudioMenu"
         onPressed: dropdownManager.toggleAudio() 
     }
+    GlobalShortcut {
+        name: "toggleNotifications"
+        onPressed: dropdownManager.toggleNotifications() 
+    }
+    
     Connections {
         target: Quickshell
         function onReloadCompleted() {
             Quickshell.inhibitReloadPopup() 
         }
-    }
-    GlobalShortcut {
-        name: "toggleNotifications"
-        onPressed: dropdownManager.toggleNotifications()
-    }
-    NotificationServer {
-        id: globalNotifServer
-    }
-    Instantiator {
-        id: notifTracker
-        model: globalNotifServer.trackedNotifications
-        delegate: QtObject {}
-    }
-    // 2. Update the popup offset logic to account for "notifications"
-    NotificationPopup {
-        id: systemNotifier
-        server: globalNotifServer 
-        isBarVisible: !root.realFullscreen
-        isAnyMenuOpen: dropdownManager.isOpen
-        
-        // 💡 2. Pass DND to Popup
-        dndEnabled: root.dndEnabled 
-        
-        property bool isRightMenuOpen: dropdownManager.isOpen && (dropdownManager.activeView === "tray" || dropdownManager.activeView === "audio" || dropdownManager.activeView === "notifications")
-        dropdownOffset: isRightMenuOpen ? (dropdownManager.currentDropHeight + 10) : 0
     }
 
     Bar {
@@ -95,25 +79,22 @@ ShellRoot {
         menuHandler: dropdownManager 
         isDropdownOpen: dropdownManager.isOpen 
         dropdownWidth: dropdownManager.currentDropWidth
-        
-        hasNotifications: notifTracker.count > 0 
-        hasActivePopup: systemNotifier.hasNotifications 
-
-        // 💡 Pass the DND state to the bar
-        dndEnabled: root.dndEnabled 
-        
         onToggleLauncherRequested: dropdownManager.toggleApps()
     }
+
+    // 💡 THE FIX: Passes the visibility state AND the dropdown offset!
+    NotificationPopup {
+        id: popups
+        isBarVisible: !root.realFullscreen
+        dropdownOffset: root.isRightMenuOpen ? (dropdownManager.currentDropHeight + 10) : 0
+    }
+
     // --- THE UNIFIED DROPDOWN MANAGER ---
     DropdownWindow {
         id: dropdownManager
-        notifServer: globalNotifServer
         isBarVisible: !root.realFullscreen
-        
-        // 💡 3. Pass DND to the DropdownManager & listen for the toggle request
-        dndEnabled: root.dndEnabled
-        onToggleDndRequested: root.dndEnabled = !root.dndEnabled
     }
+    
     // remember to not load when shell starts
     Osd {
         id: volumeOSD
@@ -209,8 +190,6 @@ ShellRoot {
                         }
                     }
                 }
-
-                // (Removed onOpacityChanged entirely)
 
                 onStatusChanged: {
                     if (status === Image.Ready && !wallpaperContainer.useFront && source !== "") {

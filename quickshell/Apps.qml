@@ -96,24 +96,36 @@ Item {
             "python3", "-c",
             "import os, json, glob\n" +
             "apps = []\n" +
-            "paths = glob.glob('/usr/share/applications/*.desktop') + \\\n" +
-            "        glob.glob(os.path.expanduser('~/.local/share/applications/*.desktop')) + \\\n" +
-            "        glob.glob('/var/lib/flatpak/exports/share/applications/*.desktop') + \\\n" +
-            "        glob.glob(os.path.expanduser('~/.local/share/flatpak/exports/share/applications/*.desktop'))\n" +
-            "for p in paths:\n" +
-            "    try:\n" +
-            "        with open(p, 'r', encoding='utf-8') as f:\n" +
-            "            app = {'name':'', 'command':'', 'icon':'', 'workingDirectory':'', 'nodisplay':False}\n" +
-            "            for line in f:\n" +
-            "                if line.startswith('Name=') and not app['name']: app['name'] = line[5:].strip().replace('\"', '')\n" +
-            "                elif line.startswith('Exec=') and not app['command']: app['command'] = line[5:].split(' %')[0].split(' @@')[0].strip().replace('\"', '')\n" +
-            "                elif line.startswith('Icon=') and not app['icon']: app['icon'] = line[5:].strip().replace('\"', '')\n" +
-            "                elif line.startswith('Path=') and not app['workingDirectory']: app['workingDirectory'] = line[5:].strip().replace('\"', '')\n" +
-            "                elif line.startswith('NoDisplay=') and line[10:].strip().lower() == 'true': app['nodisplay'] = True\n" +
-            "            if app['name'] and app['command'] and not app['nodisplay']:\n" +
-            "                del app['nodisplay']\n" +
-            "                apps.append(app)\n" +
-            "    except: pass\n" +
+            "seen_names = set()\n" +
+            "\n" +
+            "def process_files(file_list):\n" +
+            "    for p in file_list:\n" +
+            "        try:\n" +
+            "            with open(p, 'r', encoding='utf-8') as f:\n" +
+            "                app = {'name':'', 'command':'', 'icon':'', 'workingDirectory':'', 'nodisplay':False}\n" +
+            "                for line in f:\n" +
+            "                    if line.startswith('Name=') and not app['name']: app['name'] = line[5:].strip().replace('\"', '')\n" +
+            "                    elif line.startswith('Exec=') and not app['command']: app['command'] = line[5:].split(' %')[0].split(' @@')[0].strip().replace('\"', '')\n" +
+            "                    elif line.startswith('Icon=') and not app['icon']: app['icon'] = line[5:].strip().replace('\"', '')\n" +
+            "                    elif line.startswith('Path=') and not app['workingDirectory']: app['workingDirectory'] = line[5:].strip().replace('\"', '')\n" +
+            "                    elif line.startswith('NoDisplay=') and line[10:].strip().lower() == 'true': app['nodisplay'] = True\n" +
+            "                if app['name'] and app['command'] and not app['nodisplay'] and app['name'] not in seen_names:\n" +
+            "                    del app['nodisplay']\n" +
+            "                    apps.append(app)\n" +
+            "                    seen_names.add(app['name'])\n" +
+            "        except: pass\n" +
+            "\n" +
+            "# 1. Scan System Paths (Priority 1)\n" +
+            "system_paths = glob.glob('/usr/share/applications/*.desktop') + \\\n" +
+            "               glob.glob(os.path.expanduser('~/.local/share/applications/*.desktop')) + \\\n" +
+            "               glob.glob('/var/lib/flatpak/exports/share/applications/*.desktop') + \\\n" +
+            "               glob.glob(os.path.expanduser('~/.local/share/flatpak/exports/share/applications/*.desktop'))\n" +
+            "process_files(system_paths)\n" +
+            "\n" +
+            "# 2. Scan Desktop Path (Priority 2 - only if not found in system)\n" +
+            "desktop_paths = glob.glob(os.path.expanduser('~/Desktop/*.desktop'))\n" +
+            "process_files(desktop_paths)\n" +
+            "\n" +
             "print(json.dumps(apps))"
         ]
         

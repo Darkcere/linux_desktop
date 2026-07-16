@@ -4,9 +4,6 @@ import Quickshell.Wayland
 
 PanelWindow {
     id: root
-    property var notifServer
-    property bool dndEnabled: false
-    signal toggleDndRequested()
     // --- STATE MANAGEMENT ---
     property string activeView: ""
     property bool isOpen: activeView !== ""
@@ -20,7 +17,7 @@ PanelWindow {
         if (lastActiveView === "clipboard") return 950;
         if (lastActiveView === "powermenu") return 350; 
         if (lastActiveView === "audio") return 450; 
-        if (lastActiveView === "notifications") return 380; // NEW
+        if (lastActiveView === "notifications") return 450;
         return 600; 
     }
     property int currentDropHeight: {
@@ -29,7 +26,7 @@ PanelWindow {
         if (lastActiveView === "tools") return 630;
         if (lastActiveView === "powermenu") return 360; 
         if (lastActiveView === "audio") return 550; 
-        if (lastActiveView === "notifications") return 600; // NEW
+        if (lastActiveView === "notifications") return 550;
         return 450;
     }
     property bool isRightAligned: lastActiveView === "tray" || lastActiveView === "audio" || lastActiveView === "notifications"
@@ -213,23 +210,13 @@ PanelWindow {
                     }
                 }
                 Loader {
-                    id: notificationsLoader
                     anchors.fill: parent
-                    
-                    // 💡 ADD THE LAST ACTIVE VIEW CHECK HERE:
                     active: root.activeView === "notifications" || (root.lastActiveView === "notifications" && visualBox.opacity > 0)
-                    
                     opacity: root.activeView === "notifications" ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
                     sourceComponent: Component {
-                        NotificationMenu { 
-                            isOpen: root.activeView === "notifications"
-                            server: root.notifServer 
-                            dndEnabled: root.dndEnabled // (Assuming root is your DropdownWindow id)
-                            onToggleDndRequested: root.toggleDndRequested()
-                            onCloseRequested: root.closeRequested() 
-                        }
+                        NotificationCenter { isOpen: root.activeView === "notifications"; onCloseRequested: root.closeRequested() }
                     }
                 }
             }

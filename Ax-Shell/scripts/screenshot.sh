@@ -1,7 +1,5 @@
 #!/usr/bin/env sh
 
-sleep 0.25
-
 if [ -z "$XDG_PICTURES_DIR" ]; then
     XDG_PICTURES_DIR="$HOME/Pictures"
 fi
@@ -39,11 +37,30 @@ case $1 in
         ;;
 esac
 
-if [ -f "$full_path" ]; then
-   \
+# 💡 THE FIX: Give hyprshot half a second to finish writing large files to the disk
+sleep 0.5
 
-    ACTION=$(notify-send -a "Ax-Shell" -i "$full_path" "Screenshot saved" "in $full_path" \
-        -A "view=View" -A "edit=Edit" -A "open=Open Folder" -A "delete=Delete")\
+if [ -f "$full_path" ]; then
+    
+    # 💡 THE FIX: Create a tiny thumbnail in a dedicated /tmp folder for the notification
+    # This prevents DBus/Qt from choking on massive 4K PNGs
+    thumb_dir="/tmp/ax_shell_thumbs"
+    mkdir -p "$thumb_dir"
+    thumb_path="$thumb_dir/$save_file"
+    
+    # Check if ImageMagick is installed and create a fast 256x256 thumbnail
+    if command -v magick &> /dev/null; then
+        magick "$full_path" -resize 256x256\> "$thumb_path"
+    elif command -v convert &> /dev/null; then
+        convert "$full_path" -resize 256x256\> "$thumb_path"
+    else
+        # Fallback if ImageMagick isn't installed
+        thumb_path="$full_path"
+    fi
+
+    # Send the tiny thumbnail to Quickshell instead of the giant original
+    ACTION=$(notify-send -a "Ax-Shell" -i "$thumb_path" "Screenshot saved" "in $full_path" \
+        -A "view=View" -A "edit=Edit" -A "open=Open Folder" -A "delete=Delete")
 
     case "$ACTION" in
         view) xdg-open "$full_path" ;;
