@@ -114,6 +114,6 @@ Item {
         targetItem: trayContainerWrapper.hoveredItem || trayContainerWrapper
         active: trayContainerWrapper.hoveredItem !== null
         text: trayContainerWrapper.hoveredTitle
-        topMargin: 20
+        topMargin: 22
     }
 }

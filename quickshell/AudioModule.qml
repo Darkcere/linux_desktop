@@ -159,7 +159,7 @@ Row {
     // --- 5. Custom Quickshell Tooltip ---
     BarToolTip {
         targetItem: root
-        topMargin: 22
+
         active: moduleHover.hovered 
         
         text: {
@@ -171,5 +171,6 @@ Row {
             
             return sourceText + " | " + sinkText + "\nRight click to open Menu";
         }
+        topMargin: 25
     }
 }

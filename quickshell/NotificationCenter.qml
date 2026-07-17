@@ -55,8 +55,9 @@ Item {
                         anchors.centerIn: parent
                         spacing: 4
                         Text {
-                            text: NotificationManager.silent ? "🔕" : "🔔"
+                            text: NotificationManager.silent ? "" : ""
                             font.pixelSize: 12
+                            color: NotificationManager.silent ? Colors.background : Colors.text
                         }
                         Text {
                             text: "DND"
@@ -123,10 +124,11 @@ Item {
                 spacing: 8
                 
                 Text {
-                    text: NotificationManager.silent ? "🔕" : "📭"
+                    text: NotificationManager.silent ? "" : ""
                     font.pixelSize: 32
                     anchors.horizontalCenter: parent.horizontalCenter
                     opacity: 0.7
+                    color: Colors.text
                 }
                 
                 Text {

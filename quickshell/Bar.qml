@@ -172,9 +172,9 @@ PanelWindow {
                         Behavior on opacity { NumberAnimation { duration: 150 } }
                     }
                     Text {
-                        // Replaced the outlined bell with the filled bell ()
-                        text: NotificationManager.silent ? "🔕" : (hasNotifications ? "" : "")
-                        color: hasNotifications ? Colors.text : Colors.text 
+                        id: notificationbell
+                        text: NotificationManager.silent ? "" : (hasNotifications ? "" : "")
+                        color: Colors.text 
                         font.pixelSize: 14
                         anchors.verticalCenter: parent.verticalCenter
                         
@@ -183,10 +183,22 @@ PanelWindow {
                         Behavior on opacity { NumberAnimation { duration: 150 } }
                         
                         MouseArea {
+                            id: notificationbellMouseArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: mainBarWindow.menuHandler.toggleNotifications()
+                            
+                            // 💡 1. Tell the MouseArea to listen for both left and right clicks
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            
+                            // 💡 2. Route the action based on which button was pressed
+                            onClicked: (mouse) => {
+                                if (mouse.button === Qt.RightButton) {
+                                    NotificationManager.silent = !NotificationManager.silent;
+                                } else {
+                                    mainBarWindow.menuHandler.toggleNotifications();
+                                }
+                            }
                         }
                     }
                     Tray { 
@@ -205,7 +217,13 @@ PanelWindow {
         targetItem: archlogo
         active: archMouseArea.containsMouse
         text: "Open Launcher"
-        topMargin: 20
-        leftMargin: 42
+        topMargin: 24
+    }
+
+    BarToolTip {
+        targetItem: notificationbell
+        active: notificationbellMouseArea.containsMouse
+        text: "Left Click: Open Notification Center\nRight Click: Toggle DND"
+        topMargin: 24 
     }
 }

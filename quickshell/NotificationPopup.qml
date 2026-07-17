@@ -115,7 +115,8 @@ PanelWindow {
         ListView {
             id: popupListView
             anchors.fill: parent
-            anchors.margins: 10 
+            anchors.leftMargin: 10
+            anchors.rightMargin: 10
             spacing: 5
             
             interactive: false 
@@ -186,7 +187,17 @@ PanelWindow {
                     MouseArea {
                         id: mouseArea
                         anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
                         onClicked: {
+                            // 💡 1. Hyprland Regex Workspace Focus
+                            let appName = notifDelegate.currentNotif.appName;
+                            if (appName) {
+                                let safeName = appName.replace(/ /g, '.*');
+                                let cmd = `hyprctl dispatch focuswindow "class:(?i).*${safeName}.*" || hyprctl dispatch focuswindow "title:(?i).*${safeName}.*"`;
+                                Quickshell.execDetached({ command: ["bash", "-c", cmd] });
+                            }
+
+                            // 2. Standard Native Action
                             if (notifDelegate.defaultAction) {
                                 NotificationManager.attemptInvokeAction(notifDelegate.currentNotif.id, notifDelegate.defaultAction.identifier);
                             } else {

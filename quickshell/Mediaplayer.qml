@@ -205,7 +205,7 @@ Rectangle {
                 let albumInfo = root.player?.trackAlbum ? "\n󰀥  " + root.player.trackAlbum : "";
                 return "󰝚  " + root.title + "\n󰠃  " + root.artist + albumInfo;
             }
-            topMargin: 18
+            topMargin: 21
         }
     }
 }

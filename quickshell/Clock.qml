@@ -42,6 +42,6 @@ Text {
         targetItem: root
         active: clockHover.hovered
         text: "Left Click to toggle seconds"
-        topMargin: 20
+        topMargin: 23
     }
 }
