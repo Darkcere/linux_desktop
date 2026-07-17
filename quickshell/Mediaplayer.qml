@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Services.Mpris
 import Qt5Compat.GraphicalEffects
@@ -7,46 +6,38 @@ import Quickshell.Widgets
 
 Rectangle {
     id: root
-    implicitWidth: mainLayout.implicitWidth
+    implicitWidth: mainRow.implicitWidth
     implicitHeight: 24
     color: "transparent"
     enabled: root.Window.visibility !== Window.Hidden
 
-    // Use a binding property. It re-evaluates automatically whenever Mpris.players.values changes.
-    property var player: {
-        // 1. Get the list and filter out the playerctld daemon
-        const rawList = Mpris.players.values;
-        const list = rawList.filter(p => !p.dbusName.includes("playerctld"));
-        
-        if (!list || list.length === 0) return null;
-
-        // 2. Prioritize actively playing
-        const active = list.find(p => p.isPlaying);
-        if (active) return active;
-
-        // 3. Fallback to existing player if it's still in the filtered list
-        if (root.player && list.includes(root.player)) return root.player;
-
-        // 4. Fallback to first available
-        return list[0];
+    // 💡 THE FIX: Track the last used player asynchronously to avoid QML Binding Loop errors!
+    property string lastPlayerName: ""
+    onPlayerChanged: {
+        if (player) root.lastPlayerName = player.dbusName;
     }
 
-    // Connect to global player changes so the binding triggers
-    Connections {
-        target: Mpris
-        function onPlayersChanged() { 
-            // Trigger a re-evaluation of the binding by forcing a property refresh
-            // We don't set it to null; we let the binding engine do its job.
-            root.player = Qt.binding(function() {
-                const rawList = Mpris.players.values;
-                const list = rawList.filter(p => !p.dbusName.includes("playerctld"));
-                if (!list || list.length === 0) return null;
-                const active = list.find(p => p.isPlaying);
-                if (active) return active;
-                if (root.player && list.includes(root.player)) return root.player;
-                return list[0];
-            });
+    property var player: {
+        const rawList = Mpris.players.values;
+        if (!rawList || rawList.length === 0) return null;
+        
+        const validPlayers = rawList.filter(p => !p.dbusName.includes("playerctld"));
+        if (validPlayers.length === 0) return null;
+
+        // 1. Prioritize whoever is actively playing right now
+        for (let i = 0; i < validPlayers.length; i++) {
+            if (validPlayers[i].isPlaying) return validPlayers[i];
         }
+        
+        // 2. 💡 THE FIX: If nobody is playing, stick to the player we were just looking at!
+        if (root.lastPlayerName !== "") {
+            for (let i = 0; i < validPlayers.length; i++) {
+                if (validPlayers[i].dbusName === root.lastPlayerName) return validPlayers[i];
+            }
+        }
+        
+        // 3. Fallback to the first available player
+        return validPlayers[0];
     }
 
     // --- PROPERTIES ---
@@ -56,16 +47,20 @@ Rectangle {
     property bool playing: player?.isPlaying ?? false
 
     // --- MAIN LAYOUT ---
-    RowLayout {
-        id: mainLayout
+    Row {
+        id: mainRow
         anchors.fill: parent
         anchors.leftMargin: 4
         spacing: 6
         
         Item {
             id: artContainer
-            Layout.preferredWidth: 22
-            Layout.preferredHeight: 22
+            
+            // 💡 THE FIX: Explicitly center vertically inside the primitive Row
+            anchors.verticalCenter: parent.verticalCenter
+            
+            width: 22
+            height: 22
             visible: root.player !== null
             
             HoverHandler {
@@ -88,7 +83,6 @@ Rectangle {
                 }
 
                 Rectangle {
-                    
                     id: maskRect
                     width: 22; height: 22; radius: 11; visible: false
                 }
@@ -99,17 +93,14 @@ Rectangle {
                 }
 
                 Component {
-                    
                     id: artImageComp
                     Image {
                         source: root.albumArt
                         fillMode: Image.PreserveAspectCrop
-                        
-                        // OPTIMIZATION 1: Prevent main-thread freezing when changing tracks
                         asynchronous: true
                         
-                        // OPTIMIZATION 2: Cap VRAM usage. Rendered at 44x44 for High-DPI crispness
-                        sourceSize: Qt.size(44, 44)
+                        sourceSize.width: 44
+                        sourceSize.height: 44
                         
                         layer.enabled: true
                         layer.effect: OpacityMask { maskSource: maskRect }
@@ -119,7 +110,6 @@ Rectangle {
                 Component {
                     id: vinylComp
                     Rectangle {
-                        
                         color: Colors.border
                         radius: 11
                         border.width: 2
@@ -177,14 +167,21 @@ Rectangle {
         }
 
         Cavavisualizer {
+            // 💡 THE FIX: Explicitly center vertically
+            anchors.verticalCenter: parent.verticalCenter
             z: -1
         }
         
         Text {
             id: mediaTitle
+            // 💡 THE FIX: Explicitly center vertically
+            anchors.verticalCenter: parent.verticalCenter
+            
             visible: root.title
             HoverHandler { id: mediaHover }
-            Layout.maximumWidth: 200
+            
+            width: Math.min(implicitWidth, 200)
+            
             text: root.artist.length > 0 ? root.title + " • " + root.artist : root.title
             color: Colors.text
             font.pixelSize: 10
@@ -203,7 +200,8 @@ Rectangle {
             text: {
                 if (!root.player) return "";
                 let albumInfo = root.player?.trackAlbum ? "\n󰀥  " + root.player.trackAlbum : "";
-                return "󰝚  " + root.title + "\n󰠃  " + root.artist + albumInfo;
+                let artistInfo = root.artist ? "\n󰠃  " + root.artist : "";
+                return "󰝚  " + root.title + artistInfo + albumInfo;
             }
             topMargin: 21
         }

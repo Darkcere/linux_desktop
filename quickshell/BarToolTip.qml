@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Wayland // 💡 THE FIX: Required for the click-through Region mask!
 
 PopupWindow {
     id: root
@@ -12,27 +13,29 @@ PopupWindow {
     property string align: "center" 
     property int xOffset: 0         
     property int bridgeReach: 3     
-    
-    // 💡 NEW: The invisible Wayland safety buffer to prevent clipping!
     property int windowPadding: 6
     
     property Item targetItem: null
 
-    // 💡 The Wayland surface is now safely larger than the visual box
-    implicitWidth: tooltipBackground.width + Math.abs(root.xOffset) + (root.windowPadding * 2)
-    implicitHeight: tooltipBackground.fullHeight + root.bridgeReach + root.windowPadding 
+    // 💡 THE FIX: Hard width/height commands for the physical window
+    width: tooltipBackground.width + Math.abs(root.xOffset) + (root.windowPadding * 2)
+    height: tooltipBackground.fullHeight + root.bridgeReach + root.windowPadding 
     color: "transparent"
+
+    // 💡 THE FIX: The Wayland click-through mask. 
+    // This absolutely guarantees the tooltip can NEVER steal the mouse hover 
+    // state away from your panel buttons!
+    mask: Region {}
 
     anchor {
         item: root.targetItem
         edges: Edges.Bottom
-        gravity: {
-            if (root.align === "left") return Edges.Bottom | Edges.Left;
-            if (root.align === "right") return Edges.Bottom | Edges.Right;
-            return Edges.Bottom; 
-        }
+        
+        // 💡 THE FIX: Fast ternary evaluation instead of an if-return block
+        gravity: root.align === "left" ? (Edges.Bottom | Edges.Left) : 
+                 (root.align === "right" ? (Edges.Bottom | Edges.Right) : Edges.Bottom)
+                 
         margins { 
-            // 💡 Perfectly offsets the invisible padding so the visual alignment stays exact!
             top: root.topMargin - root.bridgeReach 
             left: root.align === "left" ? -root.windowPadding : 0
             right: root.align === "right" ? -root.windowPadding : 0
@@ -77,7 +80,6 @@ PopupWindow {
     // --- 3. The Visuals ---
     Item {
         anchors.fill: parent
-        // 💡 Pushes the visual box safely inside the padded bounds
         anchors.margins: root.windowPadding
         anchors.topMargin: 0 
 
@@ -99,8 +101,10 @@ PopupWindow {
                 id: tooltipBackground
                 property bool show: false
                 
-                width: contentWrapper.width
-                property int fullHeight: contentWrapper.height
+                // 💡 THE FIX: Removed the redundant contentWrapper Item. 
+                // The background reads the label's implicit size directly!
+                property int fullHeight: label.implicitHeight + 16
+                width: label.implicitWidth + 24
                 height: show ? fullHeight : 0
                 
                 anchors.top: parent.top
@@ -118,24 +122,16 @@ PopupWindow {
                 Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutQuart } }
                 Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutQuart } }
 
-                Item {
-                    id: contentWrapper
-                    width: label.implicitWidth + 24
-                    height: label.implicitHeight + 16
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-
-                    Text {
-                        id: label
-                        anchors.centerIn: parent
-                        text: root.text
-                        color: Colors.text
-                        font.pixelSize: 11
-                        font.weight: 600
-                        horizontalAlignment: Text.AlignLeft
-                        verticalAlignment: Text.AlignVCenter
-                        lineHeight: 1.2 
-                    }
+                Text {
+                    id: label
+                    anchors.centerIn: parent
+                    text: root.text
+                    color: Colors.text
+                    font.pixelSize: 11
+                    font.weight: 600
+                    horizontalAlignment: Text.AlignLeft
+                    verticalAlignment: Text.AlignVCenter
+                    lineHeight: 1.2 
                 }
             }
 
@@ -151,7 +147,6 @@ PopupWindow {
                 height: root.bridgeReach + 8 
                 color: Colors.background
                 
-                // 💡 Restored both border lines so there are no holes in your corners!
                 Rectangle { anchors.left: parent.left; width: 2; height: parent.height; color: Colors.border }
                 Rectangle { anchors.right: parent.right; width: 2; height: parent.height; color: Colors.border }
             }

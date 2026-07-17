@@ -1,7 +1,6 @@
 import Quickshell
 import Quickshell.Hyprland
 import QtQuick
-import QtQuick.Layouts
 
 Row {
     spacing: 3
@@ -19,15 +18,17 @@ Row {
             
             property int wsId: index + 1
 
-            // 🚀 THE FIX: Restored `.values.find()` so QML tracks the changes properly!
+            // 💡 RESTORED: QML needs .values to natively track C++ map updates!
             property var ws: Hyprland.workspaces.values.find(w => w.id === wsId)
 
+            // 💡 RESTORED: Quickshell's specific API for tracking window counts
             property bool isEmpty: (ws?.toplevels?.values?.length ?? 0) === 0
+            
             property bool isActive: Hyprland.focusedWorkspace?.id === wsId
             property bool isUrgent: ws?.urgent ?? false
             
-            implicitWidth: isActive ? 30 : (mouseAreaStatic.containsMouse ? 14 : 8)
-            implicitHeight: 8
+            width: isActive ? 30 : (mouseAreaStatic.containsMouse ? 14 : 8)
+            height: 8
             radius: 6
 
             color: {
@@ -38,7 +39,7 @@ Row {
             }
 
             Behavior on color { ColorAnimation { duration: 300 } }
-            Behavior on implicitWidth { NumberAnimation { duration: 200 } }
+            Behavior on width { NumberAnimation { duration: 200 } }
 
             MouseArea {
                 id: mouseAreaStatic
@@ -60,12 +61,13 @@ Row {
 
             property var ws: modelData
             property bool isActive: Hyprland.focusedWorkspace?.id === ws.id
+            
+            // 💡 RESTORED: Quickshell's specific API
             property bool isEmpty: (ws?.toplevels?.values?.length ?? 0) === 0
             property bool isUrgent: ws ? ws.urgent : false
 
-            // Kept this optimization: smooth inline sizing
-            implicitWidth: isActive ? 30 : (mouseAreaDynamic.containsMouse ? 14 : 8)
-            implicitHeight: 8
+            width: isActive ? 30 : (mouseAreaDynamic.containsMouse ? 14 : 8)
+            height: 8
             radius: 6
 
             color: {
@@ -76,7 +78,7 @@ Row {
             }
 
             Behavior on color { ColorAnimation { duration: 300 } }
-            Behavior on implicitWidth { NumberAnimation { duration: 200 } }
+            Behavior on width { NumberAnimation { duration: 200 } }
 
             MouseArea {
                 id: mouseAreaDynamic

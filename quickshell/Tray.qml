@@ -6,7 +6,7 @@ import Quickshell.Widgets
 Item {
     id: trayContainerWrapper
     visible: trayRepeater.count > 0
-    implicitWidth: trayContentRow.width + 7
+    implicitWidth: trayContentRow.width + 8
     implicitHeight: 24
 
     required property var menuHandler

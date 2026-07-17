@@ -2,6 +2,7 @@ pragma Singleton
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtCore 
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
@@ -17,7 +18,6 @@ Singleton {
                     "text": action.text
                 })) ?? []
         property bool popup: false
-        // Capturar valores inmediatamente para evitar binding issues
         property string appIcon: ""
         property string appName: ""
         property string body: ""
@@ -30,14 +30,10 @@ Singleton {
         property var localActionHandlers: ({})
         property Timer timer
 
-        // Propiedades para cache de imágenes
         property string cachedAppIcon: ""
         property string cachedImage: ""
-
-        // Indica si esta notificación fue cargada desde cache
         property bool isCached: false
 
-        // Inicializar valores cuando se asigna la notification
         onNotificationChanged: {
             if (notification) {
                 appIcon = notification.appIcon ?? "";
@@ -47,7 +43,6 @@ Singleton {
                 summary = notification.summary ?? "";
                 urgency = notification.urgency.toString() ?? "normal";
 
-                // Cachear imágenes
                 if (appIcon && !appIcon.startsWith("data:")) {
                     root.cacheImageAsBase64(appIcon, function (cachedData) {
                         cachedAppIcon = cachedData;
@@ -59,9 +54,7 @@ Singleton {
                     });
                 }
 
-                // Escuchar cuando la notificación es cerrada por la aplicación
                 notification.closed.connect(function (reason) {
-                    // CloseRequested = 3: la aplicación solicitó cerrar la notificación
                     if (reason === 3) {
                         root.discardNotification(id);
                     }
@@ -106,7 +99,6 @@ Singleton {
             target: SuspendManager
             function onWakingUp() {
                 if (!isPaused) {
-                    // Small delay after wake to prevent popups appearing while screen is still transitioning
                     wakeStartTimer.restart();
                 }
             }
@@ -116,8 +108,7 @@ Singleton {
             id: wakeStartTimer
             interval: 1000
             repeat: false
-            onTriggered: if (!isPaused)
-                parent.start()
+            onTriggered: if (!isPaused) parent.start()
         }
 
         running: !isPaused && !SuspendManager.isSuspending && interval > 0
@@ -140,23 +131,30 @@ Singleton {
     property list<Notif> list: []
     property var popupList: list.filter(notif => notif.popup)
     property bool popupInhibited: silent
-    property var latestTimeForApp: ({})
-    property var totalCounts: ({})  // Conteo total independiente del almacenamiento: {appName: {summary: count}}
+    property var totalCounts: ({}) 
 
-    Component {
-        id: notifComponent
-        Notif {}
-    }
-    Component {
-        id: notifTimerComponent
-        NotifTimer {}
+    Component { id: notifComponent; Notif {} }
+    Component { id: notifTimerComponent; NotifTimer {} }
+
+    // 💡 THE FIX 1: Native async settings cache instead of FileView!
+    Settings {
+        id: notifSettings
+        category: "CaelestiaNotifications"
+        property string cachedJSON: "[]"
     }
 
-    FileView {
-        id: notifFileView
-        // QUICKSHELL-GIT: path: Quickshell.cachePath("notifications.json")
-        path: Quickshell.env("HOME") + "/.cache/ambxst/notifications.json"
-        onLoaded: loadNotifications()
+    // 💡 THE FIX 2: Debouncer Timer for File Saving (Prevents I/O freezing during spam)
+    Timer {
+        id: saveDebounce
+        interval: 1000 // Waits 1 second after the LAST notification to stringify/save
+        onTriggered: {
+            const limitedList = limitNotificationsPerSummary(root.list);
+            notifSettings.cachedJSON = stringifyList(limitedList);
+        }
+    }
+
+    function saveNotifications() {
+        saveDebounce.restart();
     }
 
     function stringifyList(list) {
@@ -167,12 +165,10 @@ Singleton {
         return notifComponent.createObject(root, {
             "id": json.id,
             "actions": json.actions,
-            "appIcon": json.cachedAppIcon || json.appIcon  // Usar cached si disponible
-            ,
+            "appIcon": json.cachedAppIcon || json.appIcon,
             "appName": json.appName,
             "body": json.body,
-            "image": json.cachedImage || json.image  // Usar cached si disponible
-            ,
+            "image": json.cachedImage || json.image,
             "summary": json.summary,
             "time": json.time,
             "urgency": json.urgency,
@@ -180,26 +176,16 @@ Singleton {
             "replaceKey": json.replaceKey || "",
             "cachedAppIcon": json.cachedAppIcon || "",
             "cachedImage": json.cachedImage || "",
-            "isCached": json.isCached || true  // Default to true for loaded notifications
-            ,
-            "popup": false  // No popup para notificaciones cargadas
+            "isCached": json.isCached || true,
+            "popup": false 
         });
-    }
-
-    function saveNotifications() {
-        // Limitar notificaciones almacenadas a 5 por summary para evitar almacenamiento excesivo
-        const limitedList = limitNotificationsPerSummary(root.list);
-        notifFileView.setText(stringifyList(limitedList));
     }
 
     function limitNotificationsPerSummary(notifications) {
         var groups = {};
-
         notifications.forEach(notif => {
             const key = notif.appName + '|' + (notif.summary || '');
-            if (!groups[key]) {
-                groups[key] = [];
-            }
+            if (!groups[key]) groups[key] = [];
             groups[key].push(notif);
         });
 
@@ -209,21 +195,18 @@ Singleton {
             group.sort((a, b) => b.time - a.time);
             limitedNotifications.push(...group.slice(0, 5));
         }
-
         return limitedNotifications;
     }
 
     function loadNotifications() {
         try {
-            const data = JSON.parse(notifFileView.text());
+            const data = JSON.parse(notifSettings.cachedJSON === "" ? "[]" : notifSettings.cachedJSON);
             root.list = data.map(jsonToNotif);
-            // Set idOffset to max id + 1
+            
             let maxId = 0;
             root.list.forEach(notif => {
-                if (notif.id > maxId)
-                    maxId = notif.id;
-                if (notif.id <= -1000000)
-                    root.internalIdCounter = Math.max(root.internalIdCounter, Math.abs(notif.id) - 999999);
+                if (notif.id > maxId) maxId = notif.id;
+                if (notif.id <= -1000000) root.internalIdCounter = Math.max(root.internalIdCounter, Math.abs(notif.id) - 999999);
             });
             root.idOffset = maxId + 1;
         } catch (e) {
@@ -233,19 +216,36 @@ Singleton {
         }
     }
 
-    onListChanged: {
-        // Update latest time for each app
-        root.list.forEach(notif => {
-            if (!root.latestTimeForApp[notif.appName] || notif.time > root.latestTimeForApp[notif.appName]) {
-                root.latestTimeForApp[notif.appName] = Math.max(root.latestTimeForApp[notif.appName] || 0, notif.time);
+    // 💡 THE FIX 3: Merged latestTimeForApp tracking directly into groupsForList!
+    function groupsForList(sourceList) {
+        const groups = {};
+        sourceList.forEach((notif) => {
+            if (!notif || !notif.appName || (!notif.summary && !notif.body)) return;
+
+            if (!groups[notif.appName]) {
+                groups[notif.appName] = {
+                    appName: notif.appName,
+                    appIcon: notif.appIcon,
+                    notifications: [],
+                    time: 0,
+                    historyPriority: 0,
+                    totalCount: 0 
+                };
+            }
+            
+            let grp = groups[notif.appName];
+            grp.notifications.push(notif);
+            grp.totalCount++;
+            
+            // Automatically find the highest time for this group natively
+            if (notif.time > grp.time) {
+                grp.time = notif.time;
+            }
+            if ((notif.historyPriority || 0) > grp.historyPriority) {
+                grp.historyPriority = notif.historyPriority;
             }
         });
-        // Remove apps that no longer have notifications
-        Object.keys(root.latestTimeForApp).forEach(appName => {
-            if (!root.list.some(notif => notif.appName === appName)) {
-                delete root.latestTimeForApp[appName];
-            }
-        });
+        return groups;
     }
 
     function appNameListForGroups(groups) {
@@ -257,41 +257,11 @@ Singleton {
         });
     }
 
-    function groupsForList(list) {
-        const groups = {};
-        list.forEach((notif, index) => {
-            // Verificar que la notificación es válida antes de agruparla
-            if (!notif || !notif.appName || (!notif.summary && !notif.body)) {
-                return;
-            }
-
-            if (!groups[notif.appName]) {
-                groups[notif.appName] = {
-                    appName: notif.appName,
-                    appIcon: notif.appIcon,
-                    notifications: [],
-                    time: 0,
-                    historyPriority: 0,
-                    totalCount: 0  // Conteo independiente del almacenamiento
-                };
-            }
-            groups[notif.appName].notifications.push(notif);
-            groups[notif.appName].totalCount++;
-            // Always set to the latest time in the group
-            groups[notif.appName].time = latestTimeForApp[notif.appName] || notif.time;
-            groups[notif.appName].historyPriority = Math.max(groups[notif.appName].historyPriority || 0, notif.historyPriority || 0);
-        });
-
-        return groups;
-    }
-
     property var groupsByAppName: groupsForList(root.list)
     property var popupGroupsByAppName: groupsForList(root.popupList)
     property var appNameList: appNameListForGroups(root.groupsByAppName)
     property var popupAppNameList: appNameListForGroups(root.popupGroupsByAppName)
 
-    // Quickshell's notification IDs starts at 1 on each run, while saved notifications
-    // can already contain higher IDs. This is for avoiding id collisions
     property int idOffset
     property int internalIdCounter: 1
     signal initDone
@@ -312,10 +282,7 @@ Singleton {
         persistenceSupported: true
 
         onNotification: notification => {
-            // Verificar que la notificación tiene contenido válido antes de procesarla
-            if (!notification || (!notification.summary && !notification.body)) {
-                return;
-            }
+            if (!notification || (!notification.summary && !notification.body)) return;
 
             notification.tracked = true;
             const newNotifObject = notifComponent.createObject(root, {
@@ -324,18 +291,16 @@ Singleton {
                 "time": Date.now()
             });
 
-            // Usar Qt.callLater para evitar race conditions al actualizar la lista
             Qt.callLater(() => {
                 root.list = [...root.list, newNotifObject];
                 saveNotifications();
             });
 
-            // Popup - ahora se muestra en el notch en lugar de popup window
             if (!root.popupInhibited) {
                 newNotifObject.popup = true;
                 newNotifObject.timer = notifTimerComponent.createObject(root, {
                     "id": newNotifObject.id,
-                    "interval": notification.expireTimeout < 0 ? 5000 : notification.expireTimeout // Aumentado para notch
+                    "interval": notification.expireTimeout < 0 ? 5000 : notification.expireTimeout
                 });
             }
 
@@ -344,15 +309,11 @@ Singleton {
     }
 
     function notifyInternal(options) {
-        if (!options || (!options.summary && !options.body)) {
-            return null;
-        }
+        if (!options || (!options.summary && !options.body)) return null;
 
         if (options.replaceKey) {
             const existingIds = root.list.filter(notif => notif && notif.replaceKey === options.replaceKey).map(notif => notif.id);
-            if (existingIds.length > 0) {
-                root.discardNotifications(existingIds);
-            }
+            if (existingIds.length > 0) root.discardNotifications(existingIds);
         }
 
         const notificationId = -1000000 - root.internalIdCounter++;
@@ -401,13 +362,10 @@ Singleton {
     }
 
     function discardNotifications(ids) {
-        if (!ids || ids.length === 0)
-            return;
+        if (!ids || ids.length === 0) return;
 
         var idsMap = {};
-        ids.forEach(id => {
-            idsMap[id] = true;
-        });
+        ids.forEach(id => { idsMap[id] = true; });
 
         const newList = root.list.filter(notif => !idsMap[notif.id]);
         const removedCount = root.list.length - newList.length;
@@ -431,9 +389,7 @@ Singleton {
         root.list = [];
         triggerListChange();
         saveNotifications();
-        notifServer.trackedNotifications.values.forEach(notif => {
-            notif.dismiss();
-        });
+        notifServer.trackedNotifications.values.forEach(notif => { notif.dismiss(); });
         root.discardAll();
     }
 
@@ -447,8 +403,7 @@ Singleton {
         property int notificationId: -1
         onTriggered: {
             const index = root.list.findIndex(notif => notif.id === notificationId);
-            if (index !== -1 && root.list[index] != null)
-                root.list[index].popup = false;
+            if (index !== -1 && root.list[index] != null) root.list[index].popup = false;
             root.timeout(notificationId);
         }
     }
@@ -460,12 +415,8 @@ Singleton {
     }
 
     function timeoutAll() {
-        root.popupList.forEach(notif => {
-            root.timeout(notif.id);
-        });
-        root.popupList.forEach(notif => {
-            notif.popup = false;
-        });
+        root.popupList.forEach(notif => { root.timeout(notif.id); });
+        root.popupList.forEach(notif => { notif.popup = false; });
     }
 
     function attemptInvokeAction(id, notifIdentifier, autoDiscard = true) {
@@ -473,54 +424,32 @@ Singleton {
         if (notifIndex !== -1) {
             const localHandlers = root.list[notifIndex].localActionHandlers || {};
             const localHandler = localHandlers[notifIdentifier];
-            if (typeof localHandler === "function") {
-                localHandler(id);
-            }
+            if (typeof localHandler === "function") localHandler(id);
         }
 
         const notifServerIndex = notifServer.trackedNotifications.values.findIndex(notif => notif.id + root.idOffset === id);
         if (notifServerIndex !== -1) {
             const notifServerNotif = notifServer.trackedNotifications.values[notifServerIndex];
             const action = notifServerNotif.actions.find(action => action.identifier === notifIdentifier);
-            if (action) {
-                action.invoke();
-            }
+            if (action) action.invoke();
         }
-        if (autoDiscard) {
-            root.discardNotification(id);
-        }
+        if (autoDiscard) root.discardNotification(id);
     }
 
     function pauseGroupTimers(appName) {
-        root.popupList.forEach(notif => {
-            if (notif.appName === appName && notif.timer) {
-                notif.timer.pause();
-            }
-        });
+        root.popupList.forEach(notif => { if (notif.appName === appName && notif.timer) notif.timer.pause(); });
     }
 
     function resumeGroupTimers(appName) {
-        root.popupList.forEach(notif => {
-            if (notif.appName === appName && notif.timer) {
-                notif.timer.resume();
-            }
-        });
+        root.popupList.forEach(notif => { if (notif.appName === appName && notif.timer) notif.timer.resume(); });
     }
 
     function pauseAllTimers() {
-        root.popupList.forEach(notif => {
-            if (notif.timer) {
-                notif.timer.pause();
-            }
-        });
+        root.popupList.forEach(notif => { if (notif.timer) notif.timer.pause(); });
     }
 
     function resumeAllTimers() {
-        root.popupList.forEach(notif => {
-            if (notif.timer) {
-                notif.timer.resume();
-            }
-        });
+        root.popupList.forEach(notif => { if (notif.timer) notif.timer.resume(); });
     }
 
     function hideAllPopups() {
@@ -542,25 +471,10 @@ Singleton {
     property int maxConcurrentXhr: 3
 
     function cacheImageAsBase64(imageUrl, callback) {
-        if (!imageUrl || imageUrl.startsWith("data:")) {
-            callback(imageUrl);
-            return;
-        }
-
-        if (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {
-            callback(imageUrl);
-            return;
-        }
-
-        if (imageUrl.length > 2048) {
-            callback(imageUrl);
-            return;
-        }
-
-        if (activeXhrCount >= maxConcurrentXhr) {
-            callback(imageUrl);
-            return;
-        }
+        if (!imageUrl || imageUrl.startsWith("data:")) { callback(imageUrl); return; }
+        if (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) { callback(imageUrl); return; }
+        if (imageUrl.length > 2048) { callback(imageUrl); return; }
+        if (activeXhrCount >= maxConcurrentXhr) { callback(imageUrl); return; }
 
         activeXhrCount++;
         var xhr = new XMLHttpRequest();
@@ -568,10 +482,7 @@ Singleton {
         xhr.responseType = "arraybuffer";
         xhr.timeout = 5000;
 
-        var cleanupXhr = function () {
-            activeXhrCount--;
-            xhr = null;
-        };
+        var cleanupXhr = function () { activeXhrCount--; xhr = null; };
 
         xhr.onload = function () {
             if (xhr.status === 200 && xhr.response) {
@@ -580,46 +491,29 @@ Singleton {
                     var bytes = new Uint8Array(arrayBuffer);
                     var binary = '';
                     var len = Math.min(bytes.byteLength, 1024 * 1024);
-                    for (var i = 0; i < len; i++) {
-                        binary += String.fromCharCode(bytes[i]);
-                    }
+                    for (var i = 0; i < len; i++) binary += String.fromCharCode(bytes[i]);
                     var base64 = btoa(binary);
 
                     var mimeType = "image/png";
                     var lowerUrl = imageUrl.toLowerCase();
-                    if (lowerUrl.includes(".jpg") || lowerUrl.includes(".jpeg")) {
-                        mimeType = "image/jpeg";
-                    } else if (lowerUrl.includes(".gif")) {
-                        mimeType = "image/gif";
-                    } else if (lowerUrl.includes(".webp")) {
-                        mimeType = "image/webp";
-                    }
+                    if (lowerUrl.includes(".jpg") || lowerUrl.includes(".jpeg")) mimeType = "image/jpeg";
+                    else if (lowerUrl.includes(".gif")) mimeType = "image/gif";
+                    else if (lowerUrl.includes(".webp")) mimeType = "image/webp";
 
                     callback("data:" + mimeType + ";base64," + base64);
-                } catch (e) {
-                    callback(imageUrl);
-                }
-            } else {
-                callback(imageUrl);
-            }
+                } catch (e) { callback(imageUrl); }
+            } else { callback(imageUrl); }
             cleanupXhr();
         };
 
-        xhr.onerror = function () {
-            callback(imageUrl);
-            cleanupXhr();
-        };
-
-        xhr.ontimeout = function () {
-            callback(imageUrl);
-            cleanupXhr();
-        };
-
+        xhr.onerror = function () { callback(imageUrl); cleanupXhr(); };
+        xhr.ontimeout = function () { callback(imageUrl); cleanupXhr(); };
         xhr.send();
     }
 
     Component.onCompleted: {
-        notifFileView.reload();
+        // 💡 THE FIX 4: Call loadNotifications manually instead of relying on the old FileView
+        loadNotifications();
         root.initDone();
     }
 }

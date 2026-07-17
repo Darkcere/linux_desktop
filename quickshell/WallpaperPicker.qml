@@ -7,11 +7,29 @@ import Qt5Compat.GraphicalEffects
 
 Item {
     id: pickerWindow
-    
+    Shortcut {
+        sequence: "Escape"
+        onActivated: root.closeRequested()
+    }
     property bool isOpen: false
     signal closeRequested()
 
     signal wallpaperSelected(string path)
+
+    // 💡 THE FIX: Instant C++ Cache
+    Settings {
+        id: wallpaperSettings
+        category: "CaelestiaWallpapers"
+        property string cachedWallpapers: "[]"
+        property string cachedActive: ""
+    }
+
+    property var allWallpapersData: JSON.parse(wallpaperSettings.cachedWallpapers === "" ? "[]" : wallpaperSettings.cachedWallpapers)
+    property var currentWallpapers: allWallpapersData
+    property int selectedIndex: 0
+    
+    property string activeWallpaperPath: wallpaperSettings.cachedActive
+    property var stagedRandomEntry: null 
 
     Timer {
         id: applyThemeTimer
@@ -24,15 +42,16 @@ Item {
     }
 
     Component.onCompleted: {
-        // Run ONLY ONCE at startup
         fetchWallpapersProcess.running = true
+        if (allWallpapersData.length > 0) {
+            pickerWindow.rollRandomWallpaper();
+        }
     }
     
     Timer {
         id: focusTimer
         interval: 50
         onTriggered: {
-            // This will trigger onTextChanged -> searchDebounce -> filterWallpapers IF text wasn't already empty
             searchInput.text = ""
             searchInput.forceActiveFocus()
         }
@@ -44,25 +63,23 @@ Item {
         onTriggered: pickerWindow.filterWallpapers(searchInput.text)
     }
     
-    // OPTIMIZATION: Removed backgroundScanTimer. We don't need to os.walk every time we open the menu.
     Timer {
         id: loadDelayTimer
-        interval: 350 // Match your morphSpeed
+        interval: 350 
         onTriggered: filterWallpapers(searchInput.text)
     }
+
     onIsOpenChanged: {
         if (isOpen) {
             focusTimer.start()
             loadDelayTimer.start()
             
-            // If the model is empty (e.g. first load) but we have data, populate it immediately
-            if (searchInput.text === "" && wallpaperModel.count === 0 && allWallpapersData.length > 0) {
+            if (searchInput.text === "" && currentWallpapers.length === 0 && allWallpapersData.length > 0) {
                  filterWallpapers("")
             }
         }
     }
 
-    // OPTIMIZATION: Manual refresh for when you actually add a new wallpaper
     Shortcut {
         sequence: "Ctrl+R"
         enabled: pickerWindow.isOpen
@@ -71,15 +88,6 @@ Item {
             fetchWallpapersProcess.running = true
         }
     }
-
-    property var allWallpapersData: []
-    property var currentWallpapers: []
-    property int selectedIndex: 0
-    
-    property string activeWallpaperPath: ""
-    property var stagedRandomEntry: null 
-
-    ListModel { id: wallpaperModel }
 
     function rollRandomWallpaper() {
         let actualWallpapers = pickerWindow.allWallpapersData.filter(w => w.path !== "random_trigger");
@@ -95,14 +103,15 @@ Item {
         
         if (targetPath === "random_trigger") {
             if (!pickerWindow.stagedRandomEntry) return; 
-            targetPath = pickerWindow.stagedRandomEntry.path;
+            
+            // 💡 THE FIX: Use rawPath so the bash symlink works!
+            targetPath = pickerWindow.stagedRandomEntry.rawPath;
         }
         
         pickerWindow.activeWallpaperPath = targetPath;
+        wallpaperSettings.cachedActive = targetPath; // 💡 Update the cache!
         pickerWindow.wallpaperSelected(targetPath);
         
-        // EXECUTE IMMEDIATELY
-        // No timer needed. Quickshell.execDetached runs it as a standalone process.
         let bashCmd = `
             echo "${targetPath}" > "$HOME/.current_wall_path"
             ln -sf "${targetPath}" "$HOME/.current.wall"
@@ -110,8 +119,6 @@ Item {
         `;
         
         Quickshell.execDetached({ command: ["bash", "-c", bashCmd] });
-        
-        // Close the UI
         pickerWindow.closeRequested();
         
         if (entry.rawPath === "random_trigger") {
@@ -138,13 +145,14 @@ Item {
             "            subfolder = os.path.dirname(rel)\n" +
             "            if not subfolder: subfolder = 'Main Folder'\n" +
             "            name = os.path.basename(path).rsplit('.', 1)[0]\n" +
-            "            wps.append({'name': name, 'path': path, 'subfolder': subfolder})\n" +
+            "            # Pre-calculate the Qt paths to save QML processing later\n" +
+            "            wps.append({'name': name, 'path': 'file://' + path, 'rawPath': path, 'subfolder': subfolder})\n" +
             "\n" +
             "if os.path.exists(link_path):\n" +
             "    current_wall = os.path.realpath(link_path)\n" +
             "elif wps:\n" +
             "    random_wp = random.choice(wps)\n" +
-            "    current_wall = random_wp['path']\n" +
+            "    current_wall = random_wp['rawPath']\n" +
             "    os.symlink(current_wall, link_path)\n" +
             "\n" +
             "print(json.dumps({'current': current_wall, 'wallpapers': wps}))"
@@ -158,21 +166,28 @@ Item {
                     let activeChanged = (data.current && data.current !== "" && 
                                        data.current !== pickerWindow.activeWallpaperPath);
 
-                    pickerWindow.allWallpapersData = data.wallpapers;
-                    pickerWindow.allWallpapersData.sort((a, b) => a.name.localeCompare(b.name));
+                    let freshArray = data.wallpapers;
+                    freshArray.sort((a, b) => a.name.localeCompare(b.name));
                     
-                    pickerWindow.allWallpapersData.unshift({
+                    freshArray.unshift({
                         "name": "Random Wallpaper",
                         "path": "random_trigger",
+                        "rawPath": "random_trigger",
                         "subfolder": "Surprise Me"
                     });
                     
+                    pickerWindow.allWallpapersData = freshArray;
+                    
+                    // 💡 THE FIX: Save the parsed array to the native config file
+                    wallpaperSettings.cachedWallpapers = JSON.stringify(freshArray);
+                    
                     if (activeChanged) {
                         pickerWindow.activeWallpaperPath = data.current;
+                        wallpaperSettings.cachedActive = data.current;
                     }
 
-                    if (fileCountChanged || wallpaperModel.count === 0) {
-                        if (wallpaperModel.count === 0) {
+                    if (fileCountChanged || currentWallpapers.length === 0) {
+                        if (currentWallpapers.length === 0) {
                             pickerWindow.rollRandomWallpaper(); 
                         }
                         filterWallpapers(searchInput.text);
@@ -184,33 +199,20 @@ Item {
         }
     }
 
+    // 💡 THE FIX: Native JS array filtering instead of ListModel building!
     function filterWallpapers(query) {
-        wallpaperModel.clear();
-        let tempArr = [];
-        let batchData = []; 
-        
-        pickerWindow.selectedIndex = 0;
         let lowerQuery = query.toLowerCase();
         
-        for (let i = 0; i < allWallpapersData.length; i++) {
-            let item = allWallpapersData[i];
-            if (item.name.toLowerCase().includes(lowerQuery) || 
-                item.subfolder.toLowerCase().includes(lowerQuery)) {
-                
-                tempArr.push(item);
-                batchData.push({ 
-                    "name": item.name, 
-                    "path": item.path === "random_trigger" ? "" : "file://" + item.path,
-                    "rawPath": item.path,
-                    "subfolder": item.subfolder
-                });
-            }
+        if (lowerQuery === "") {
+            pickerWindow.currentWallpapers = pickerWindow.allWallpapersData;
+        } else {
+            pickerWindow.currentWallpapers = pickerWindow.allWallpapersData.filter(
+                item => item.name.toLowerCase().includes(lowerQuery) || 
+                        item.subfolder.toLowerCase().includes(lowerQuery)
+            );
         }
         
-        if (batchData.length > 0) {
-            wallpaperModel.append(batchData);
-        }
-        pickerWindow.currentWallpapers = tempArr;
+        pickerWindow.selectedIndex = 0;
     }
 
     Column {
@@ -246,33 +248,18 @@ Item {
                 
                 onTextChanged: searchDebounce.restart()
                 
-                Keys.onEscapePressed: (event) => { event.accepted = true; pickerWindow.closeRequested(); }
-                Keys.onRightPressed: (event) => {
-                    event.accepted = true;
-                    if (wallpaperModel.count > 0) {
-                        wallpaperGrid.moveCurrentIndexRight();
-                        pickerWindow.selectedIndex = wallpaperGrid.currentIndex;
-                    }
-                }
-                Keys.onLeftPressed: (event) => {
-                    event.accepted = true;
-                    if (wallpaperModel.count > 0) {
-                        wallpaperGrid.moveCurrentIndexLeft();
-                        pickerWindow.selectedIndex = wallpaperGrid.currentIndex;
-                    }
-                }
                 Keys.onDownPressed: (event) => {
                     event.accepted = true;
-                    if (wallpaperModel.count > 0) {
-                        wallpaperGrid.moveCurrentIndexDown();
-                        pickerWindow.selectedIndex = wallpaperGrid.currentIndex;
+                    if (pickerWindow.currentWallpapers.length > 0) {
+                        pickerWindow.selectedIndex = Math.min(pickerWindow.selectedIndex + 1, pickerWindow.currentWallpapers.length - 1);
+                        wallpaperGrid.positionViewAtIndex(pickerWindow.selectedIndex, GridView.Contain);
                     }
                 }
                 Keys.onUpPressed: (event) => {
                     event.accepted = true;
-                    if (wallpaperModel.count > 0) {
-                        wallpaperGrid.moveCurrentIndexUp();
-                        pickerWindow.selectedIndex = wallpaperGrid.currentIndex;
+                    if (pickerWindow.currentWallpapers.length > 0) {
+                        pickerWindow.selectedIndex = Math.max(pickerWindow.selectedIndex - 1, 0);
+                        wallpaperGrid.positionViewAtIndex(pickerWindow.selectedIndex, GridView.Contain);
                     }
                 }
                 Keys.onReturnPressed: (event) => {
@@ -294,7 +281,9 @@ Item {
                 width: (parent.width * 0.6) - 7.5 
                 height: parent.height 
                 clip: true
-                model: wallpaperModel 
+                
+                // 💡 THE FIX: Bind directly to the JS array
+                model: pickerWindow.currentWallpapers 
                 currentIndex: pickerWindow.selectedIndex
                 
                 cellWidth: width / 3
@@ -343,14 +332,18 @@ Item {
                         Image {
                             id: thumbImg
                             anchors.fill: parent
-                            source: model.rawPath === "random_trigger" 
-                                ? (pickerWindow.stagedRandomEntry ? "file://" + pickerWindow.stagedRandomEntry.path : "")
-                                : model.path
-                            fillMode: Image.PreserveAspectCrop
                             
+                            // 💡 THE FIX: Just use .path directly, no "file://" prefix needed!
+                            source: modelData.rawPath === "random_trigger" 
+                                ? (pickerWindow.stagedRandomEntry ? pickerWindow.stagedRandomEntry.path : "")
+                                : modelData.path
+                            
+                            fillMode: Image.PreserveAspectCrop
                             asynchronous: true 
                             cache: true 
-                            sourceSize: Qt.size(128, 128)
+                            
+                            sourceSize.width: 128
+                            sourceSize.height: 128
                             
                             visible: false
                         }
@@ -359,8 +352,7 @@ Item {
                             anchors.fill: parent
                             source: thumbImg
                             maskSource: thumbMask
-                            
-                            opacity: (wpMouseArea.containsMouse || wallpaperGrid.currentIndex === index || model.rawPath === pickerWindow.activeWallpaperPath) ? 1.0 : 0.6
+                            opacity: (wpMouseArea.containsMouse || wallpaperGrid.currentIndex === index || modelData.rawPath === pickerWindow.activeWallpaperPath) ? 1.0 : 0.6
                             Behavior on opacity { NumberAnimation { duration: 150 } }
                         }
                         
@@ -368,14 +360,14 @@ Item {
                             anchors.fill: parent
                             color: Colors.background
                             opacity: 0.65
-                            visible: model.rawPath === "random_trigger"
+                            visible: modelData.rawPath === "random_trigger"
                         }
                         
                         Text {
                             anchors.centerIn: parent
                             text: "🎲"
                             font.pixelSize: 42
-                            visible: model.rawPath === "random_trigger"
+                            visible: modelData.rawPath === "random_trigger"
                             opacity: (wpMouseArea.containsMouse || wallpaperGrid.currentIndex === index) ? 1.0 : 0.7
                             Behavior on opacity { NumberAnimation { duration: 150 } }
                         }
@@ -383,7 +375,7 @@ Item {
                         Rectangle {
                             anchors.fill: parent
                             color: "transparent"
-                            border.color: (model.rawPath === pickerWindow.activeWallpaperPath || wpMouseArea.containsMouse || wallpaperGrid.currentIndex === index) ? Colors.workspaceactive : "transparent"
+                            border.color: (modelData.rawPath === pickerWindow.activeWallpaperPath || wpMouseArea.containsMouse || wallpaperGrid.currentIndex === index) ? Colors.workspaceactive : "transparent"
                             border.width: 2
                             radius: 8 
                         }
@@ -396,7 +388,7 @@ Item {
                             height: 20
                             radius: 4
                             color: Colors.workspaceactive
-                            visible: model.rawPath === pickerWindow.activeWallpaperPath
+                            visible: modelData.rawPath === pickerWindow.activeWallpaperPath
                             
                             Text {
                                 anchors.centerIn: parent
@@ -428,7 +420,7 @@ Item {
                 radius: 8
                 border.color: Colors.border
                 border.width: 2
-                visible: wallpaperModel.count > 0
+                visible: pickerWindow.currentWallpapers.length > 0
 
                 Column {
                     anchors.fill: parent
@@ -451,17 +443,24 @@ Item {
                             id: largeImg
                             anchors.fill: parent
                             source: {
-                                if (wallpaperModel.count === 0 || pickerWindow.selectedIndex < 0) return "";
-                                let item = wallpaperModel.get(pickerWindow.selectedIndex);
+                                if (pickerWindow.currentWallpapers.length === 0 || pickerWindow.selectedIndex < 0) return "";
+                                
+                                let item = pickerWindow.currentWallpapers[pickerWindow.selectedIndex];
+                                if (!item) return "";
+                                
                                 if (item.rawPath === "random_trigger") {
-                                    return pickerWindow.stagedRandomEntry ? "file://" + pickerWindow.stagedRandomEntry.path : "";
+                                    // 💡 THE FIX: Just use .path directly!
+                                    return pickerWindow.stagedRandomEntry ? pickerWindow.stagedRandomEntry.path : "";
                                 }
                                 return item.path;
                             }
                             fillMode: Image.PreserveAspectFit
                             asynchronous: true
                             cache: true
-                            sourceSize: Qt.size(256, 256)
+                            
+                            sourceSize.width: 256
+                            sourceSize.height: 256
+                            
                             visible: false
                         }
 
@@ -480,8 +479,10 @@ Item {
                         Text {
                             width: parent.width
                             text: {
-                                if (wallpaperModel.count === 0 || pickerWindow.selectedIndex < 0) return "";
-                                let item = wallpaperModel.get(pickerWindow.selectedIndex);
+                                if (pickerWindow.currentWallpapers.length === 0 || pickerWindow.selectedIndex < 0) return "";
+                                let item = pickerWindow.currentWallpapers[pickerWindow.selectedIndex];
+                                if (!item) return "";
+                                
                                 if (item.rawPath === "random_trigger") {
                                     return pickerWindow.stagedRandomEntry ? "🎲 " + pickerWindow.stagedRandomEntry.name : "Random Wallpaper";
                                 }
@@ -496,8 +497,10 @@ Item {
                         Text {
                             width: parent.width
                             text: {
-                                if (wallpaperModel.count === 0 || pickerWindow.selectedIndex < 0) return "";
-                                let item = wallpaperModel.get(pickerWindow.selectedIndex);
+                                if (pickerWindow.currentWallpapers.length === 0 || pickerWindow.selectedIndex < 0) return "";
+                                let item = pickerWindow.currentWallpapers[pickerWindow.selectedIndex];
+                                if (!item) return "";
+                                
                                 if (item.rawPath === "random_trigger") {
                                     return pickerWindow.stagedRandomEntry ? pickerWindow.stagedRandomEntry.subfolder : "Surprise Me";
                                 }
@@ -546,7 +549,11 @@ Item {
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
-                        sourceSize: Qt.size(64, 64)
+                        
+                        // 💡 THE FIX: Integer bounds mapping
+                        sourceSize.width: 64
+                        sourceSize.height: 64
+                        
                         visible: false
                     }
 

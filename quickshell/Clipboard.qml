@@ -9,15 +9,20 @@ Item {
     property bool isOpen: false
     signal closeRequested()
 
-    ListModel { id: clipModel }
-    
-    property var fullClipData: []
+    // 💡 Read from the instant C++ cache immediately on startup
+    property var fullClipData: JSON.parse(clipboardSettings.cachedClips === "" ? "[]" : clipboardSettings.cachedClips)
+    property var currentClipData: fullClipData 
     property int selectedIndex: 0
     
     // Track current preview metadata
     property string metaType: "Text"
     property string metaSize: "0 bytes"
-
+    
+    Settings {
+        id: clipboardSettings
+        category: "CaelestiaClipboard"
+        property string cachedClips: "[]"
+    }
     // --- TIMERS ---
     Timer {
         id: focusTimer
@@ -28,7 +33,6 @@ Item {
         }
     }
 
-    // Debounce the preview loading so holding the arrow key doesn't freeze the UI
     Timer {
         id: previewDebounce
         interval: 150
@@ -43,7 +47,7 @@ Item {
     }
 
     onSelectedIndexChanged: {
-        if (isOpen && clipModel.count > 0) {
+        if (isOpen && currentClipData.length > 0) {
             previewDebounce.restart()
         }
     }
@@ -54,11 +58,9 @@ Item {
         command: ["bash", "-c", "cliphist list | head -n 60"] 
         stdout: StdioCollector {
             onStreamFinished: {
-                clipModel.clear();
-                fullClipData = [];
-                
                 if (text.trim() === "") {
-                    // OPTIMIZATION: Reset metadata if empty
+                    clipboardWindow.fullClipData = [];
+                    clipboardWindow.currentClipData = [];
                     clipboardWindow.metaType = "None";
                     clipboardWindow.metaSize = "0 bytes";
                     clipboardWindow.loadPreview();
@@ -66,6 +68,8 @@ Item {
                 }
                 
                 let lines = text.trim().split('\n');
+                let tempArr = [];
+                
                 for (let i = 0; i < lines.length; i++) {
                     let parts = lines[i].split('\t');
                     if (parts.length >= 2) {
@@ -75,22 +79,17 @@ Item {
                         let isImg = rawText.includes("[[ binary data");
                         let displayTitle = isImg ? "Image Data" : rawText.trim().substring(0, 120).replace(/\n/g, " ");
                         
-                        let item = { 
-                            idStr: idStr, 
-                            title: displayTitle, 
-                            isImage: isImg, 
-                            rawText: rawText 
-                        };
-                        
-                        fullClipData.push(item);
-                        clipModel.append({ 
-                            "clipId": item.idStr, 
-                            "clipTitle": item.title,
-                            "isImage": item.isImage,
-                            "rawText": item.rawText
+                        tempArr.push({ 
+                            clipId: idStr, 
+                            clipTitle: displayTitle,
+                            isImage: isImg,
+                            rawText: rawText
                         });
                     }
                 }
+                
+                clipboardWindow.fullClipData = tempArr;
+                clipboardWindow.currentClipData = tempArr;
                 clipboardWindow.selectedIndex = 0;
                 clipboardWindow.loadPreview();
             }
@@ -98,19 +97,17 @@ Item {
     }
     
     function filterClips(query) {
-        clipModel.clear();
         let lowerQuery = query.toLowerCase();
         
-        for (let i = 0; i < fullClipData.length; i++) {
-            if (fullClipData[i].title.toLowerCase().includes(lowerQuery)) {
-                clipModel.append({ 
-                    "clipId": fullClipData[i].idStr, 
-                    "clipTitle": fullClipData[i].title,
-                    "isImage": fullClipData[i].isImage,
-                    "rawText": fullClipData[i].rawText
-                });
-            }
+        // 💡 THE FIX: Native JS array filtering is lightning fast!
+        if (lowerQuery === "") {
+            clipboardWindow.currentClipData = clipboardWindow.fullClipData;
+        } else {
+            clipboardWindow.currentClipData = clipboardWindow.fullClipData.filter(
+                item => item.clipTitle.toLowerCase().includes(lowerQuery)
+            );
         }
+        
         clipboardWindow.selectedIndex = 0;
         clipboardWindow.loadPreview();
     }
@@ -123,14 +120,11 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: {
                 if (!previewProcess.fetchingImage) {
-                    // It's text
                     previewText.text = text;
                     previewImage.visible = false;
                     previewTextScroll.visible = true;
                     clipboardWindow.metaSize = text.length + " chars";
                 } else {
-                    // OPTIMIZATION: Decode Base64 string directly into QtQuick memory
-                    // We strip newlines from the bash base64 output just to be safe
                     let cleanB64 = text.replace(/\n/g, "");
                     previewImage.source = "data:image/png;base64," + cleanB64;
                     previewTextScroll.visible = false;
@@ -141,17 +135,17 @@ Item {
     }
 
     function loadPreview() {
-        if (clipModel.count === 0 || selectedIndex < 0) {
+        if (clipboardWindow.currentClipData.length === 0 || selectedIndex < 0) {
             previewText.text = "No item selected.";
             previewImage.visible = false;
             previewTextScroll.visible = true;
-            // Reset metadata
             clipboardWindow.metaType = "None";
             clipboardWindow.metaSize = "0 bytes";
             return;
         }
 
-        let item = clipModel.get(selectedIndex);
+        // 💡 Use the array index directly
+        let item = clipboardWindow.currentClipData[selectedIndex];
         
         if (item.isImage) {
             clipboardWindow.metaType = "Image";
@@ -159,9 +153,6 @@ Item {
             clipboardWindow.metaSize = match ? match[1] : "Unknown size";
             
             previewProcess.fetchingImage = true;
-            
-            // OPTIMIZATION: Pipe to base64 instead of writing to disk!
-            // -w 0 ensures base64 output has no line wrapping
             previewProcess.command = ["bash", "-c", "cliphist decode " + item.clipId + " | base64 -w 0"];
         } else {
             clipboardWindow.metaType = "Text";
@@ -181,9 +172,13 @@ Item {
     
     function clearClipboard() {
         Quickshell.execDetached({ command: ["bash", "-c", "cliphist wipe"] });
-        clipModel.clear();
-        fullClipData = [];
-        selectedIndex = -1;
+        clipboardWindow.fullClipData = [];
+        clipboardWindow.currentClipData = [];
+        
+        // 💡 THE FIX: Wipe the cache
+        clipboardSettings.cachedClips = "[]";
+        
+        clipboardWindow.selectedIndex = -1;
         loadPreview();
         searchInput.forceActiveFocus();
     }
@@ -231,22 +226,22 @@ Item {
                     Keys.onEscapePressed: (event) => { event.accepted = true; clipboardWindow.closeRequested(); }
                     Keys.onDownPressed: (event) => {
                         event.accepted = true;
-                        if (clipModel.count > 0) {
-                            clipboardWindow.selectedIndex = Math.min(clipboardWindow.selectedIndex + 1, clipModel.count - 1);
+                        if (clipboardWindow.currentClipData.length > 0) {
+                            clipboardWindow.selectedIndex = Math.min(clipboardWindow.selectedIndex + 1, clipboardWindow.currentClipData.length - 1);
                             clipList.positionViewAtIndex(clipboardWindow.selectedIndex, ListView.Contain);
                         }
                     }
                     Keys.onUpPressed: (event) => {
                         event.accepted = true;
-                        if (clipModel.count > 0) {
+                        if (clipboardWindow.currentClipData.length > 0) {
                             clipboardWindow.selectedIndex = Math.max(clipboardWindow.selectedIndex - 1, 0);
                             clipList.positionViewAtIndex(clipboardWindow.selectedIndex, ListView.Contain);
                         }
                     }
                     Keys.onReturnPressed: (event) => {
                         event.accepted = true;
-                        if (clipboardWindow.selectedIndex >= 0 && clipboardWindow.selectedIndex < clipModel.count) {
-                            clipboardWindow.copyClip(clipModel.get(clipboardWindow.selectedIndex).clipId);
+                        if (clipboardWindow.selectedIndex >= 0 && clipboardWindow.selectedIndex < clipboardWindow.currentClipData.length) {
+                            clipboardWindow.copyClip(clipboardWindow.currentClipData[clipboardWindow.selectedIndex].clipId);
                         }
                     }
                 }
@@ -257,7 +252,9 @@ Item {
                 width: parent.width
                 height: parent.height - 90
                 clip: true
-                model: clipModel
+                
+                // 💡 Bind to JS Array
+                model: clipboardWindow.currentClipData 
                 currentIndex: clipboardWindow.selectedIndex
                 spacing: 4
                 
@@ -267,6 +264,8 @@ Item {
                     
                     Rectangle {
                         anchors.fill: parent
+                        
+                        // 💡 THE FIX: Back to currentIndex === index since the search bar holds the focus!
                         color: (clipMouseArea.containsMouse || clipList.currentIndex === index) ? Colors.workspaceactive : "transparent"
                         radius: 6
                         opacity: (clipMouseArea.containsMouse || clipList.currentIndex === index) ? 1.0 : 0.7
@@ -287,7 +286,7 @@ Item {
                                 
                                 Text {
                                     anchors.centerIn: parent
-                                    text: model.isImage ? "" : "T"
+                                    text: modelData.isImage ? "" : "T"
                                     font.pixelSize: 16
                                     color: (clipList.currentIndex === index) ? Colors.background : Colors.text
                                 }
@@ -301,15 +300,15 @@ Item {
                                 
                                 Text {
                                     width: parent.width
-                                    text: model.clipTitle
+                                    text: modelData.clipTitle
                                     color: (clipList.currentIndex === index) ? Colors.background : Colors.text
                                     font.pixelSize: 13
-                                    font.bold: clipList.currentIndex === index
+                                    font.bold: (clipList.currentIndex === index)
                                     elide: Text.ElideRight 
                                 }
                                 
                                 Text {
-                                    text: model.isImage ? "Image copied" : "Text snippet"
+                                    text: modelData.isImage ? "Image copied" : "Text snippet"
                                     color: (clipList.currentIndex === index) ? Colors.background : Colors.text
                                     opacity: 0.6
                                     font.pixelSize: 11
@@ -323,7 +322,7 @@ Item {
                             hoverEnabled: true
                             onClicked: {
                                 clipboardWindow.selectedIndex = index;
-                                clipboardWindow.copyClip(model.clipId);
+                                clipboardWindow.copyClip(modelData.clipId);
                             }
                         }
                     }
@@ -335,7 +334,6 @@ Item {
                 height: 30
                 spacing: 10
 
-                // Clear All Button
                 Rectangle {
                     width: (parent.width - 10)
                     height: parent.height
@@ -373,14 +371,12 @@ Item {
             Column {
                 anchors.fill: parent
                 
-                // Content Area
                 Rectangle {
                     width: parent.width
                     height: parent.height - 40
                     color: "transparent"
                     clip: true
                     
-                    // TEXT PREVIEW
                     Flickable {
                         id: previewTextScroll
                         anchors.fill: parent
@@ -400,22 +396,21 @@ Item {
                         }
                     }
                     
-                    // IMAGE PREVIEW
                     Image {
                         id: previewImage
                         anchors.fill: parent
                         anchors.margins: 10
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
-                        // OPTIMIZATION: Restrict VRAM usage for giant screenshots
-                        sourceSize: Qt.size(400, 400)
                         
-                        // NOTE: cache: false is no longer needed since we aren't bypassing URL caches
+                        // 💡 THE FIX: Don't create a dynamic Qt.size object, just assign directly
+                        sourceSize.width: 400
+                        sourceSize.height: 400
+                        
                         visible: false
                     }
                 }
                 
-                // Footer / Metadata Area
                 Rectangle {
                     width: parent.width
                     height: 40

@@ -20,10 +20,7 @@ Item {
         Layout.fillWidth: true
         from: 0
         to: 1
-        
-        // Enable hover detection for the slider
         hoverEnabled: true 
-        
         property bool isPlaying: false
         
         background: Rectangle {
@@ -78,15 +75,10 @@ Item {
             implicitWidth: 14
             implicitHeight: 14
             radius: 7
-            
-            // Change color based on pressed/hovered states
             color: control.pressed ? Colors.workspaceurgent 
                                    : (control.hovered ? Colors.workspaceactive : Colors.text)
-            
-            // Pop the handle size up slightly when interacting
             scale: (control.hovered || control.pressed) ? 1.25 : 1.0
             
-            // Smooth transitions for the hover/press effects
             Behavior on color { ColorAnimation { duration: 150 } }
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutBack } }
         }
@@ -113,7 +105,10 @@ Item {
             VolumeSlider {
                 value: Pipewire.defaultAudioSink?.audio.volume ?? 0
                 isPlaying: Pipewire.defaultAudioSink?.state === 3
-                onValueChanged: if (Pipewire.defaultAudioSink) Pipewire.defaultAudioSink.audio.volume = value
+                
+                // 💡 FIX: Swapped to onMoved to prevent feedback loop spikes
+                onMoved: if (Pipewire.defaultAudioSink) Pipewire.defaultAudioSink.audio.volume = value
+                
                 MouseArea { anchors.fill: parent; acceptedButtons: Qt.NoButton; onWheel: (wheel) => { if (Pipewire.defaultAudioSink) { let s = 0.05; Pipewire.defaultAudioSink.audio.volume = Math.max(0, Math.min(1, Pipewire.defaultAudioSink.audio.volume + (wheel.angleDelta.y > 0 ? s : -s))); } } }
             }
             
@@ -136,7 +131,10 @@ Item {
             VolumeSlider {
                 value: Pipewire.defaultAudioSource?.audio.volume ?? 0
                 isPlaying: Pipewire.defaultAudioSource?.state === 3
-                onValueChanged: if (Pipewire.defaultAudioSource) Pipewire.defaultAudioSource.audio.volume = value
+                
+                // 💡 FIX: Swapped to onMoved
+                onMoved: if (Pipewire.defaultAudioSource) Pipewire.defaultAudioSource.audio.volume = value
+                
                 MouseArea { anchors.fill: parent; acceptedButtons: Qt.NoButton; onWheel: (wheel) => { if (Pipewire.defaultAudioSource) { let s = 0.05; Pipewire.defaultAudioSource.audio.volume = Math.max(0, Math.min(1, Pipewire.defaultAudioSource.audio.volume + (wheel.angleDelta.y > 0 ? s : -s))); } } }
             }
 
@@ -155,11 +153,9 @@ Item {
             clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             
-            // --- CUSTOM STYLED SCROLLBAR ON THE RIGHT ---
             ScrollBar.vertical: ScrollBar {
                 id: vbar
                 policy: ScrollBar.AsNeeded
-                
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.bottom: parent.bottom
@@ -168,56 +164,72 @@ Item {
                     implicitWidth: 6
                     implicitHeight: 40
                     radius: 3
-                    
-                    color: vbar.pressed ? Colors.workspaceurgent 
-                                        : (vbar.hovered ? Colors.workspaceactive : Colors.secondary)
-                    
+                    color: vbar.pressed ? Colors.workspaceurgent : (vbar.hovered ? Colors.workspaceactive : Colors.secondary)
                     opacity: vbar.active ? 1.0 : 0.5
-                    
                     Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutSine } }
                     Behavior on color { ColorAnimation { duration: 150 } }
                 }
-                
-                background: Rectangle {
-                    implicitWidth: 6
-                    color: "transparent"
-                }
+                background: Rectangle { implicitWidth: 6; color: "transparent" }
             }
             
             Column {
                 width: appScrollView.width - (vbar.visible ? vbar.width + 6 : 0)
-                spacing: 8
+                spacing: 12 // Slightly expanded spacing to replace Layout margin offsets
                 
                 Repeater {
                     model: Pipewire.nodes
-                    delegate: ColumnLayout {
+                    
+                    // 💡 FIX: Swapped out nested heavy layouts for primitive Column/Row types
+                    delegate: Column {
                         width: parent.width 
+                        spacing: 4
+                        
                         PwObjectTracker { objects: [modelData] }
 
                         property bool valid: modelData !== null
-                        property var props: valid && modelData.properties ? modelData.properties : ({})
-                        property bool isPlaybackStream: (props["media.class"] === "Stream/Output/Audio")
+                        property var props: valid && modelData.properties ? modelData.properties : null
+                        property bool isPlaybackStream: props && (props["media.class"] === "Stream/Output/Audio")
                         property var pwAudio: valid ? modelData.audio : null
                         
+                        // Keeps unneeded streams perfectly flat and dropped from tree geometry calculations
                         visible: isPlaybackStream
+                        height: isPlaybackStream ? implicitHeight : 0
 
                         Text { 
-                            text: props["application.name"] || props["media.name"] || modelData.name || "Unknown App"
-                            color: Colors.text; Layout.fillWidth: true; elide: Text.ElideRight; font.pixelSize: 14
+                            width: parent.width
+                            text: props ? (props["application.name"] || props["media.name"] || modelData.name || "Unknown App") : "Unknown App"
+                            color: Colors.text
+                            elide: Text.ElideRight
+                            font.pixelSize: 14
                         }
                         
-                        RowLayout {
-                            Layout.fillWidth: true; spacing: 10; Layout.bottomMargin: 10
+                        Row {
+                            width: parent.width
+                            spacing: 10
                             
                             VolumeSlider {
+                                width: parent.width - 45 // Provides standard layout constraint without Layout.fillWidth
                                 value: pwAudio ? pwAudio.volume : 0
                                 isPlaying: valid && modelData.state === 3
-                                onValueChanged: if (pwAudio) pwAudio.volume = value
+                                
+                                // 💡 FIX: Swapped to onMoved here as well!
+                                onMoved: if (pwAudio) pwAudio.volume = value
+                                
                                 MouseArea { anchors.fill: parent; acceptedButtons: Qt.NoButton; onWheel: (wheel) => { if (pwAudio) { let s = 0.05; pwAudio.volume = Math.max(0, Math.min(1, pwAudio.volume + (wheel.angleDelta.y > 0 ? s : -s))); } } }
                             }
 
-                            Text { text: Math.round((pwAudio ? pwAudio.volume : 0) * 100) + "%"; color: Colors.text; font.pixelSize: 14; Layout.minimumWidth: 35; horizontalAlignment: Text.AlignRight }
+                            Text { 
+                                width: 35
+                                text: Math.round((pwAudio ? pwAudio.volume : 0) * 100) + "%"
+                                color: Colors.text
+                                font.pixelSize: 14
+                                horizontalAlignment: Text.AlignRight
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
                         }
+                        
+                        // Extra spacing buffer at base of item
+                        Item { width: 1; height: 6 }
                     }
                 }
             }

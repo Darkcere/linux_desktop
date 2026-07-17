@@ -13,7 +13,6 @@ PanelWindow {
     property bool hasNotifications: NotificationManager.list.length > 0 
     property bool hasActivePopup: NotificationManager.popupList.length > 0
 
-    // 💡 NEW: DND property for the Bar
     property bool dndEnabled: false
 
     signal toggleLauncherRequested()
@@ -29,17 +28,19 @@ PanelWindow {
     }
 
     margins {
-        top: 5
+        top: 2
         left: 7
         right: 7
     }
 
-    implicitHeight: 28
+    // 💡 THE FIX: Hard command instead of a suggestion
+    height: 28
     color: "transparent"
 
     Rectangle {
         id: barVisuals
-        implicitHeight: parent.height
+        // 💡 THE FIX: Bind directly to the parent's hard command
+        height: parent.height
         anchors.verticalCenter: parent.verticalCenter
         
         anchors.horizontalCenter: mainBarWindow.isRightAlignedMode ? undefined : parent.horizontalCenter
@@ -85,7 +86,6 @@ PanelWindow {
             opacity: (!mainBarWindow.isDropdownOpen && mainBarWindow.hasActivePopup) ? 1 : 0
             visible: opacity > 0
             
-            // ✅ ADDED anchors.bottom: parent.bottom so it pushes down into the corner!
             Rectangle { 
                 anchors.left: parent.left; 
                 anchors.bottom: parent.bottom; 
@@ -109,7 +109,8 @@ PanelWindow {
             x: -barVisuals.x 
             y: 0
             width: mainBarWindow.width
-            implicitHeight: mainBarWindow.height
+            // 💡 THE FIX: Hard command
+            height: mainBarWindow.height
 
             Item {
                 anchors.fill: parent
@@ -134,12 +135,13 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         Behavior on color { ColorAnimation { duration: 150 } }
                         
-                        MouseArea {
-                            id: archMouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
+                        // 💡 THE FIX: Zero-geometry input handling
+                        HoverHandler {
+                            id: archHover
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: mainBarWindow.toggleLauncherRequested()
+                        }
+                        TapHandler {
+                            onTapped: mainBarWindow.toggleLauncherRequested()
                         }
                     }
                     
@@ -165,35 +167,46 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 5 
                     
+                    // --- 1. AUDIO ---
                     AudioModule {
+                        property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "audio")
                         anchors.verticalCenter: parent.verticalCenter
-                        opacity: (menuHandler && menuHandler.activeView && menuHandler.activeView !== "audio") ? 0 : 1
-                        visible: opacity > 0
+                        width: isActive ? implicitWidth : 0
+                        opacity: isActive ? 1 : 0
+                        clip: true 
+                        visible: width > 0 
+                        
+                        Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
                         Behavior on opacity { NumberAnimation { duration: 150 } }
                     }
+                    
+                    // --- 2. NOTIFICATIONS ---
                     Text {
                         id: notificationbell
+                        property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "notifications")
+                        
                         text: NotificationManager.silent ? "" : (hasNotifications ? "" : "")
                         color: Colors.text 
                         font.pixelSize: 14
                         anchors.verticalCenter: parent.verticalCenter
                         
-                        opacity: (menuHandler && menuHandler.activeView && menuHandler.activeView !== "notifications") ? 0 : 1
-                        visible: opacity > 0
+                        width: isActive ? implicitWidth : 0
+                        opacity: isActive ? 1 : 0
+                        clip: true 
+                        visible: width > 0
+                        
+                        Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
                         Behavior on opacity { NumberAnimation { duration: 150 } }
                         
-                        MouseArea {
-                            id: notificationbellMouseArea
-                            anchors.fill: parent
-                            hoverEnabled: true
+                        // 💡 THE FIX: Zero-geometry right/left click separation
+                        HoverHandler {
+                            id: bellHover
                             cursorShape: Qt.PointingHandCursor
-                            
-                            // 💡 1. Tell the MouseArea to listen for both left and right clicks
+                        }
+                        TapHandler {
                             acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            
-                            // 💡 2. Route the action based on which button was pressed
-                            onClicked: (mouse) => {
-                                if (mouse.button === Qt.RightButton) {
+                            onTapped: (eventPoint, button) => {
+                                if (button === Qt.RightButton) {
                                     NotificationManager.silent = !NotificationManager.silent;
                                 } else {
                                     mainBarWindow.menuHandler.toggleNotifications();
@@ -201,11 +214,19 @@ PanelWindow {
                             }
                         }
                     }
+                    
+                    // --- 3. TRAY ---
                     Tray { 
+                        property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "tray")
                         anchors.verticalCenter: parent.verticalCenter
-                        opacity: (menuHandler && menuHandler.activeView && menuHandler.activeView !== "tray") ? 0 : 1
-                        visible: opacity > 0
+                        width: isActive ? implicitWidth : 0
+                        opacity: isActive ? 1 : 0
+                        clip: true 
+                        visible: width > 0 
+                        
+                        Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
                         Behavior on opacity { NumberAnimation { duration: 150 } }
+                        
                         menuHandler: mainBarWindow.menuHandler
                     }
                 }
@@ -213,16 +234,17 @@ PanelWindow {
         }
     }
     
+    // 💡 THE FIX: Connected to the new HoverHandlers
     BarToolTip {
         targetItem: archlogo
-        active: archMouseArea.containsMouse
+        active: archHover.hovered
         text: "Open Launcher"
         topMargin: 24
     }
 
     BarToolTip {
         targetItem: notificationbell
-        active: notificationbellMouseArea.containsMouse
+        active: bellHover.hovered
         text: "Left Click: Open Notification Center\nRight Click: Toggle DND"
         topMargin: 24 
     }

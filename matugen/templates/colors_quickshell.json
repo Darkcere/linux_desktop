@@ -1,0 +1,10 @@
+{
+    "background": "{{colors.background.default.hex}}",
+    "workspaceurgent": "{{colors.error.default.hex | lighten: -10.0}}",
+    "workspaceactive": "{{colors.on_primary.default.hex | lighten: 30.0}}",
+    "border": "{{colors.primary.default.hex}}",
+    "workspace": "{{colors.on_primary.default.hex | lighten: 20.0}}",
+    "text": "{{colors.primary.default.hex}}",
+    "secondary": "{{colors.secondary.default.hex}}",
+    "outline": "{{colors.outline.default.hex}}"
+}

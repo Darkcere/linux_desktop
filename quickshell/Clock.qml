@@ -21,23 +21,20 @@ Text {
     font.weight: 600
     font.pixelSize: 13
     
-    HoverHandler { id: clockHover }
-
-    // --- 1. MOUSE AREA ---
-    MouseArea {
-        anchors.fill: parent
+    // 💡 THE FIX: HoverHandler handles both the tooltip state AND the custom cursor natively!
+    HoverHandler { 
+        id: clockHover 
         cursorShape: Qt.PointingHandCursor
-        
+    }
+
+    // 💡 THE FIX: TapHandler replaces MouseArea. It handles the click in C++ 
+    // without creating a physical, invisible box in the Scene Graph!
+    TapHandler {
         acceptedButtons: Qt.LeftButton 
-        
-        onClicked: (mouse) => {
-            if (mouse.button === Qt.LeftButton) {
-                root.showSeconds = !root.showSeconds;
-            }
-        }
+        onTapped: root.showSeconds = !root.showSeconds
     }
     
-    // --- 2. THE ANIMATED TOOLTIP ---
+    // --- THE ANIMATED TOOLTIP ---
     BarToolTip {
         targetItem: root
         active: clockHover.hovered

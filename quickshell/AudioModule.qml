@@ -41,7 +41,6 @@ Row {
         text: AudioService.source?.audio?.muted ? "󰍭" : "󰍬"
         font.pixelSize: 15
         color: AudioService.source?.audio?.muted ? Colors.border : root.activeColor
-        HoverHandler { id: micHover }
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
@@ -62,7 +61,6 @@ Row {
         }
         font.pixelSize: 15
         color: root.activeColor
-        HoverHandler { id: speakerHover }
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
@@ -145,12 +143,10 @@ Row {
                     if (safeVol !== steppedValue) value = safeVol;
                 }
             }
-
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
-                acceptedButtons: Qt.NoButton 
-                // In Slider MouseArea
+                acceptedButtons: Qt.NoButton // 💡 Lets clicks pass through to the slider!
                 onWheel: (wheel) => root.changeVolume(wheel.angleDelta.y, 0.01)
             }
         }
@@ -163,6 +159,8 @@ Row {
         active: moduleHover.hovered 
         
         text: {
+            if (!active) return ""; // 💡 Wakes up ONLY when hovered!
+            
             let sink = AudioService.sink?.audio;
             let source = AudioService.source?.audio;
             

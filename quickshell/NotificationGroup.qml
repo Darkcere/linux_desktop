@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Services.Notifications
 import "./notification_utils.js" as NotificationUtils
@@ -13,7 +12,7 @@ Item {
     property bool expanded: groupData.notifications.length === 1
 
     width: ListView.view.width
-    height: backgroundRect.implicitHeight
+    height: backgroundRect.height // Tracks the background height for smooth sliding
     
     Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutQuart } }
 
@@ -28,34 +27,46 @@ Item {
     Rectangle {
         id: backgroundRect
         width: parent.width
-        implicitHeight: mainCol.implicitHeight + 24
+        height: mainCol.implicitHeight + 24
         color: "transparent"
         border.color: Colors.border
         border.width: 1
         radius: 8
         clip: true
 
-        ColumnLayout {
+        // 💡 THE FIX: Swapped ColumnLayout for Column
+        Column {
             id: mainCol
             anchors { top: parent.top; left: parent.left; right: parent.right; margins: 12 }
             spacing: 12
 
             // --- GROUP HEADER ROW ---
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
+            // 💡 THE FIX: Swapped RowLayout for anchored primitive Item (Instant render)
+            Item {
+                width: parent.width
+                height: 24
 
                 Image {
-                    Layout.preferredWidth: 20
-                    Layout.preferredHeight: 20
+                    id: headerIcon
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 20
+                    height: 20
                     source: resolveImage("", groupData.appIcon || (groupData.notifications.length > 0 ? groupData.notifications[0].appIcon : ""))
                     fillMode: Image.PreserveAspectFit
                     visible: groupData.notifications[0].appIcon != ""
-                    sourceSize: Qt.size(20, 20)
+                    
+                    // 💡 THE FIX: Explicit integer sourceSize
+                    sourceSize.width: 20
+                    sourceSize.height: 20
                 }
 
                 Text {
-                    Layout.fillWidth: true
+                    anchors.left: headerIcon.visible ? headerIcon.right : parent.left
+                    anchors.leftMargin: headerIcon.visible ? 8 : 0
+                    anchors.right: expandPill.visible ? expandPill.left : closeGroupBtn.left
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
                     text: root.appName
                     color: Colors.text
                     font.bold: true
@@ -65,9 +76,14 @@ Item {
 
                 // Expand Pill Button
                 Rectangle {
+                    id: expandPill
                     visible: groupData.notifications.length > 1
-                    implicitWidth: expandRow.implicitWidth + 16
-                    implicitHeight: 24
+                    width: expandRow.width + 16
+                    height: 24
+                    anchors.right: closeGroupBtn.left
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    
                     color: expandMouse.containsMouse ? Colors.workspaceactive : "transparent"
                     border.color: Colors.border
                     border.width: 1
@@ -103,8 +119,11 @@ Item {
 
                 // Close Group Button
                 Rectangle {
-                    Layout.preferredWidth: 24
-                    Layout.preferredHeight: 24
+                    id: closeGroupBtn
+                    width: 24
+                    height: 24
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
                     radius: 6
                     color: closeGroupMouse.containsMouse ? Colors.workspaceactive : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
@@ -131,23 +150,27 @@ Item {
                 }
             }
 
-            // --- REPEATER FOR INDIVIDUAL NOTIFICATIONS ---
-            ColumnLayout {
-                Layout.fillWidth: true
+            // --- INDIVIDUAL NOTIFICATIONS CONTAINER ---
+            Column {
+                width: parent.width
                 spacing: 8
                 
+                // 💡 THE FIX: By controlling height and visible, the parent Column 
+                // shrinks instantly and triggers the smooth sliding root Behavior!
+                height: root.expanded ? implicitHeight : 0
+                visible: height > 0
                 opacity: root.expanded ? 1 : 0
-                visible: opacity > 0
+                clip: true
+                
                 Behavior on opacity { NumberAnimation { duration: 200 } }
 
                 Repeater {
-                    model: root.expanded ? groupData.notifications : []
+                    model: groupData.notifications // Always feed data, we hide the parent wrapper
                     
                     delegate: Rectangle {
                         id: groupItemDelegate 
                         property var currentNotif: modelData
 
-                        // 💡 THE FIX: Action parsers properly separated!
                         property var defaultAction: {
                             if (!currentNotif.actions) return null;
                             for (let i = 0; i < currentNotif.actions.length; i++) {
@@ -167,8 +190,8 @@ Item {
                             return arr;
                         }
 
-                        Layout.fillWidth: true
-                        implicitHeight: groupContentCol.implicitHeight + 16
+                        width: parent.width
+                        height: groupContentCol.implicitHeight + 16
                         color: "transparent"
                         radius: 8
 
@@ -195,7 +218,6 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                // 💡 Hyprland Regex Workspace Focus!
                                 let appName = groupItemDelegate.currentNotif.appName;
                                 if (appName) {
                                     let safeName = appName.replace(/ /g, '.*');
@@ -211,24 +233,25 @@ Item {
                             }
                         }
 
-                        ColumnLayout {
+                        // 💡 THE FIX: Swapped ColumnLayout for Column
+                        Column {
                             id: groupContentCol
                             anchors { top: parent.top; left: parent.left; right: parent.right; margins: 8 }
                             spacing: 6
 
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Layout.alignment: Qt.AlignTop
+                            // 💡 THE FIX: Swapped RowLayout for Row
+                            Row {
+                                width: parent.width
                                 spacing: 12
-                                Layout.topMargin: index > 0 ? 6 : 0
+                                
+                                // Push down slightly if it's not the first item
+                                Item { width: 1; height: index > 0 ? 6 : 0; visible: index > 0 }
 
-                                // 💡 THE FIX: Uses App Icon as fallback so it doesn't collapse!
                                 Rectangle {
                                     property string imgSrc: resolveImage(groupItemDelegate.currentNotif.cachedImage || groupItemDelegate.currentNotif.image, groupItemDelegate.currentNotif.cachedAppIcon || groupItemDelegate.currentNotif.appIcon)
                                     visible: imgSrc !== ""
-                                    Layout.preferredWidth: visible ? 48 : 0
-                                    Layout.preferredHeight: visible ? 48 : 0
-                                    Layout.alignment: Qt.AlignTop
+                                    width: visible ? 48 : 0
+                                    height: visible ? 48 : 0
                                     color: "transparent"
                                     radius: 8
                                     clip: true
@@ -237,21 +260,30 @@ Item {
                                         anchors.fill: parent
                                         source: parent.imgSrc
                                         fillMode: Image.PreserveAspectCrop 
-                                        sourceSize: Qt.size(128, 128)
+                                        
+                                        // 💡 THE FIX: Explicit integer sourceSize
+                                        sourceSize.width: 128
+                                        sourceSize.height: 128
+                                        
                                         asynchronous: true
                                         onStatusChanged: if (status === Image.Error) parent.visible = false
                                     }
                                 }
 
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    Layout.alignment: Qt.AlignTop
+                                Column {
+                                    width: parent.width - (parent.children[1].visible ? 60 : 0) - (index > 0 ? 1 : 0) // Account for the spacer and icon
                                     spacing: 4
 
-                                    RowLayout {
-                                        Layout.fillWidth: true
+                                    Item {
+                                        width: parent.width
+                                        height: Math.max(summaryText.implicitHeight, 20)
+                                        
                                         Text {
-                                            Layout.fillWidth: true
+                                            id: summaryText
+                                            anchors.left: parent.left
+                                            anchors.right: timeText.left
+                                            anchors.rightMargin: 8
+                                            anchors.verticalCenter: parent.verticalCenter
                                             text: groupItemDelegate.currentNotif.summary
                                             color: Colors.text
                                             font.bold: true
@@ -259,14 +291,21 @@ Item {
                                             elide: Text.ElideRight
                                         }
                                         Text {
+                                            id: timeText
+                                            anchors.right: closeIndRect.left
+                                            anchors.rightMargin: 8
+                                            anchors.verticalCenter: parent.verticalCenter
                                             text: NotificationUtils.getFriendlyNotifTimeString(groupItemDelegate.currentNotif.time)
                                             color: Colors.text
                                             font.pixelSize: 11
                                             opacity: 0.5
                                         }
                                         Rectangle {
-                                            Layout.preferredWidth: 20
-                                            Layout.preferredHeight: 20
+                                            id: closeIndRect
+                                            width: 20
+                                            height: 20
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: parent.verticalCenter
                                             radius: 4
                                             color: closeIndMouse.containsMouse ? Colors.workspaceactive : "transparent"
                                             Behavior on color { ColorAnimation { duration: 100 } }
@@ -291,7 +330,7 @@ Item {
                                     }
 
                                     Text {
-                                        Layout.fillWidth: true
+                                        width: parent.width
                                         text: NotificationUtils.processNotificationBody(groupItemDelegate.currentNotif.body, groupItemDelegate.currentNotif.appName)
                                         color: Colors.text
                                         font.pixelSize: 13
@@ -306,8 +345,8 @@ Item {
 
                             // --- INLINE REPLY ---
                             Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 32
+                                width: parent.width
+                                height: 32
                                 visible: groupItemDelegate.currentNotif.notification && groupItemDelegate.currentNotif.notification.hasInlineReply
                                 color: "transparent"
                                 border.color: Colors.border
@@ -345,9 +384,8 @@ Item {
                             }
 
                             // --- ACTION BUTTONS ---
-                            // 💡 THE FIX: Safely reads from customActions!
-                            RowLayout {
-                                Layout.fillWidth: true
+                            Row {
+                                width: parent.width
                                 spacing: 8
                                 visible: groupItemDelegate.customActions.length > 0
 
@@ -355,8 +393,10 @@ Item {
                                     model: groupItemDelegate.customActions
 
                                     delegate: Rectangle {
-                                        Layout.fillWidth: true
-                                        Layout.preferredHeight: 28
+                                        // 💡 THE FIX: Math instead of Layout.fillWidth
+                                        width: (parent.width - (parent.spacing * (groupItemDelegate.customActions.length - 1))) / groupItemDelegate.customActions.length
+                                        height: 28
+                                        
                                         color: actionMouse.containsMouse ? Colors.workspaceactive : "transparent"
                                         border.color: Colors.border
                                         border.width: 1

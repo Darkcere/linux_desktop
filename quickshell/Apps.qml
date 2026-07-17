@@ -60,7 +60,6 @@ Item {
     property var usageCounts: JSON.parse(appSettings.usageData || "{}")
     property string actionPrefix: ">"
 
-    ListModel { id: appModel }
 
     function sortApps() {
         launcherWindow.allAppsData.sort((a, b) => {
@@ -143,8 +142,6 @@ Item {
     }
 
     function filterApps(query) {
-        appModel.clear();
-        let tempArr = [];
         launcherWindow.selectedIndex = 0; 
         
         if (query.startsWith(launcherWindow.actionPrefix)) {
@@ -153,18 +150,30 @@ Item {
         }
 
         let lowerQuery = query.toLowerCase();
+        
+        let nameStartsWith = [];
+        let cmdStartsWith = [];
+        let nameContains = [];
+        let cmdContains = [];
+
         for (let i = 0; i < allAppsData.length; i++) {
-            if (allAppsData[i].name.toLowerCase().includes(lowerQuery)) {
-                tempArr.push(allAppsData[i]); 
-                appModel.append({
-                    "name": allAppsData[i].name,
-                    "command": allAppsData[i].command,
-                    "icon": allAppsData[i].icon,
-                    "workingDirectory": allAppsData[i].workingDirectory
-                });
+            let app = allAppsData[i];
+            let nameLower = app.name.toLowerCase();
+            let cmdLower = (app.command || "").toLowerCase();
+            
+            if (nameLower.startsWith(lowerQuery)) {
+                nameStartsWith.push(app);
+            } else if (cmdLower.startsWith(lowerQuery)) {
+                cmdStartsWith.push(app);
+            } else if (nameLower.includes(lowerQuery)) {
+                nameContains.push(app);
+            } else if (cmdLower.includes(lowerQuery)) {
+                cmdContains.push(app);
             }
         }
-        launcherWindow.currentApps = tempArr; 
+        
+        // 💡 THE FIX: Just assign the array. The ListView will update automatically.
+        launcherWindow.currentApps = nameStartsWith.concat(cmdStartsWith, nameContains, cmdContains); 
     }
 
     Column {
@@ -206,15 +215,15 @@ Item {
                 }
                 
                 Keys.onDownPressed: (event) => {
-                    if (appModel.count > 0) {
-                        launcherWindow.selectedIndex = Math.min(launcherWindow.selectedIndex + 1, appModel.count - 1);
+                    if (launcherWindow.currentApps.length > 0) {
+                        launcherWindow.selectedIndex = Math.min(launcherWindow.selectedIndex + 1, launcherWindow.currentApps.length - 1);
                         appsList.positionViewAtIndex(launcherWindow.selectedIndex, ListView.Contain);
                     }
                     event.accepted = true;
                 }
                 
                 Keys.onUpPressed: (event) => {
-                    if (appModel.count > 0) {
+                    if (launcherWindow.currentApps.length > 0) {
                         launcherWindow.selectedIndex = Math.max(launcherWindow.selectedIndex - 1, 0);
                         appsList.positionViewAtIndex(launcherWindow.selectedIndex, ListView.Contain);
                     }
@@ -248,7 +257,10 @@ Item {
             width: parent.width
             height: parent.height - 60 
             clip: true
-            model: appModel 
+            
+            // 💡 THE FIX: Bind directly to the JS array!
+            model: launcherWindow.currentApps 
+            
             currentIndex: launcherWindow.selectedIndex
             spacing: 5
 
@@ -278,10 +290,11 @@ Item {
                         Image {
                             id: appIconImg
                             anchors.fill: parent
-                            source: model.icon ? ("image://icon/" + model.icon) : ""
+                            
+                            // 💡 Use modelData when iterating raw arrays
+                            source: modelData.icon ? ("image://icon/" + modelData.icon) : ""
                             fillMode: Image.PreserveAspectFit
                             
-                            // OPTIMIZATION: Prevents huge master system icons from consuming massive uncompressed RAM/VRAM
                             sourceSize.width: 36
                             sourceSize.height: 36
                             
@@ -296,7 +309,8 @@ Item {
                             
                             Text {
                                 anchors.centerIn: parent
-                                text: model.name ? model.name[0] : "?" 
+                                // 💡 Use modelData
+                                text: modelData.name ? modelData.name[0] : "?" 
                                 color: (appMouseArea.containsMouse || appsList.currentIndex === index) ? Colors.background : Colors.text
                                 font.pixelSize: 18
                                 font.bold: true
@@ -305,7 +319,8 @@ Item {
                     }
 
                     Text {
-                        text: model.name
+                        // 💡 Use modelData
+                        text: modelData.name
                         color: (appMouseArea.containsMouse || appsList.currentIndex === index) ? Colors.background : Colors.text
                         font.pixelSize: 15
                         font.bold: (appMouseArea.containsMouse || appsList.currentIndex === index)
@@ -323,10 +338,7 @@ Item {
                         hoverEnabled: true
                         
                         onClicked: {
-                            if (index >= 0 && index < launcherWindow.currentApps.length) {
-                                let entry = launcherWindow.currentApps[index];
-                                launcherWindow.launchApp(entry);
-                            }
+                            launcherWindow.launchApp(modelData);
                         }
                     }
                 }

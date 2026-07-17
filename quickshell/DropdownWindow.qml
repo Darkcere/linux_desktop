@@ -11,23 +11,35 @@ PanelWindow {
     property bool isBarVisible: false
     property var currentTrayItem: null
     // --- DYNAMIC MORPHING DIMENSIONS ---
+    // --- DYNAMIC MORPHING DIMENSIONS ---
     property int currentDropWidth: {
         if (lastActiveView === "tray") return trayMenuView.item ? trayMenuView.item.implicitWidth : 600; 
-        if (lastActiveView === "wallpaper") return 950;
-        if (lastActiveView === "clipboard") return 950;
-        if (lastActiveView === "powermenu") return 350; 
-        if (lastActiveView === "audio") return 450; 
-        if (lastActiveView === "notifications") return 450;
-        return 600; 
+        
+        // Define a fast lookup table
+        const widths = {
+            "wallpaper": 950,
+            "clipboard": 950,
+            "powermenu": 350,
+            "audio": 450,
+            "notifications": 450
+        };
+        // Return the mapped value, or default to 600
+        return widths[lastActiveView] ?? 600;
     }
+
     property int currentDropHeight: {
         if (lastActiveView === "tray") return trayMenuView.item ? trayMenuView.item.implicitHeight : 450; 
-        if (lastActiveView === "wallpaper") return 500;
-        if (lastActiveView === "tools") return 630;
-        if (lastActiveView === "powermenu") return 360; 
-        if (lastActiveView === "audio") return 550; 
-        if (lastActiveView === "notifications") return 550;
-        return 450;
+        
+        // Define a fast lookup table
+        const heights = {
+            "wallpaper": 500,
+            "tools": 630,
+            "powermenu": 360,
+            "audio": 550,
+            "notifications": 550
+        };
+        // Return the mapped value, or default to 450
+        return heights[lastActiveView] ?? 450;
     }
     property bool isRightAligned: lastActiveView === "tray" || lastActiveView === "audio" || lastActiveView === "notifications"
     property int morphSpeed: 350
@@ -103,7 +115,12 @@ PanelWindow {
         
         Behavior on width { NumberAnimation { duration: root.morphSpeed; easing.type: Easing.OutQuart } }
         Behavior on height { NumberAnimation { duration: root.morphSpeed; easing.type: Easing.OutQuart } }
-        Behavior on opacity { NumberAnimation { duration: 100 } }
+        Behavior on opacity { 
+            NumberAnimation { 
+                id: opacityAnim
+                duration: 100 
+            } 
+        }
 
         MouseArea { anchors.fill: parent } 
 
@@ -129,7 +146,7 @@ PanelWindow {
 
                 Loader {
                     anchors.fill: parent
-                    active: root.activeView === "apps" || (root.lastActiveView === "apps" && visualBox.opacity > 0)
+                    active: root.activeView === "apps" || (root.lastActiveView === "apps" && opacityAnim.running)
                     opacity: root.activeView === "apps" ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
@@ -141,7 +158,7 @@ PanelWindow {
                 Loader {
                     id: trayMenuView
                     anchors.fill: parent
-                    active: root.activeView === "tray" || (root.lastActiveView === "tray" && visualBox.opacity > 0)
+                    active: root.activeView === "tray" || (root.lastActiveView === "tray" && opacityAnim.running)
                     opacity: root.activeView === "tray" ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: 150 } }
@@ -157,7 +174,7 @@ PanelWindow {
                 Loader {
                     id: wallpaperPickerLoader
                     anchors.fill: parent
-                    active: root.activeView === "wallpaper" || (root.lastActiveView === "wallpaper" && visualBox.opacity > 0)
+                    active: root.activeView === "wallpaper" || (root.lastActiveView === "wallpaper" && opacityAnim.running)
                     opacity: root.activeView === "wallpaper" ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
@@ -168,7 +185,7 @@ PanelWindow {
                 
                 Loader {
                     anchors.fill: parent
-                    active: root.activeView === "powermenu" || (root.lastActiveView === "powermenu" && visualBox.opacity > 0)
+                    active: root.activeView === "powermenu" || (root.lastActiveView === "powermenu" && opacityAnim.running)
                     opacity: root.activeView === "powermenu" ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
@@ -179,7 +196,7 @@ PanelWindow {
                 
                 Loader {
                     anchors.fill: parent
-                    active: root.activeView === "clipboard" || (root.lastActiveView === "clipboard" && visualBox.opacity > 0)
+                    active: root.activeView === "clipboard" || (root.lastActiveView === "clipboard" && opacityAnim.running)
                     opacity: root.activeView === "clipboard" ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
@@ -190,7 +207,7 @@ PanelWindow {
                 
                 Loader {
                     anchors.fill: parent
-                    active: root.activeView === "tools" || (root.lastActiveView === "tools" && visualBox.opacity > 0)
+                    active: root.activeView === "tools" || (root.lastActiveView === "tools" && opacityAnim.running)
                     opacity: root.activeView === "tools" ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
@@ -201,7 +218,7 @@ PanelWindow {
 
                 Loader {
                     anchors.fill: parent
-                    active: root.activeView === "audio" || (root.lastActiveView === "audio" && visualBox.opacity > 0)
+                    active: root.activeView === "audio" || (root.lastActiveView === "audio" && opacityAnim.running)
                     opacity: root.activeView === "audio" ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
@@ -209,9 +226,10 @@ PanelWindow {
                         AudioMenu { isOpen: root.activeView === "audio"; onCloseRequested: root.closeRequested() }
                     }
                 }
+                
                 Loader {
                     anchors.fill: parent
-                    active: root.activeView === "notifications" || (root.lastActiveView === "notifications" && visualBox.opacity > 0)
+                    active: root.activeView === "notifications" || (root.lastActiveView === "notifications" && opacityAnim.running)
                     opacity: root.activeView === "notifications" ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }

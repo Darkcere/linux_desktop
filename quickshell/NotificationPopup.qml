@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Wayland
@@ -19,12 +18,10 @@ PanelWindow {
     anchors { top: true; right: true }
     
     margins { 
-        // 💡 Adds the offset so it slides under your open menus!
         top: dropdownOffset 
         right: 7 
     }
 
-    // 💡 Smoothly glides down when a menu opens, and glides back up when it closes
     Behavior on margins.top { NumberAnimation { duration: 300; easing.type: Easing.OutQuart } }
 
     width: 348
@@ -102,7 +99,7 @@ PanelWindow {
         Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
         Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.InOutQuad } }
 
-        // Seamless Bridge (Only shows if bar is visible AND no dropdown menu is pushing it down!)
+        // Seamless Bridge
         Rectangle {
             id: seamlessBridge
             visible: popupWindow.hasNotifications && popupWindow.isBarVisible && popupWindow.dropdownOffset === 0
@@ -189,7 +186,6 @@ PanelWindow {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            // 💡 1. Hyprland Regex Workspace Focus
                             let appName = notifDelegate.currentNotif.appName;
                             if (appName) {
                                 let safeName = appName.replace(/ /g, '.*');
@@ -197,7 +193,6 @@ PanelWindow {
                                 Quickshell.execDetached({ command: ["bash", "-c", cmd] });
                             }
 
-                            // 2. Standard Native Action
                             if (notifDelegate.defaultAction) {
                                 NotificationManager.attemptInvokeAction(notifDelegate.currentNotif.id, notifDelegate.defaultAction.identifier);
                             } else {
@@ -206,7 +201,8 @@ PanelWindow {
                         }
                     }
 
-                    ColumnLayout {
+                    // 💡 THE FIX: Swapped ColumnLayout for Column
+                    Column {
                         id: contentCol
                         anchors {
                             top: parent.top; left: parent.left; right: parent.right
@@ -215,16 +211,16 @@ PanelWindow {
                         spacing: 10
 
                         // --- MAIN CONTENT (Left Image, Right Column) ---
-                        RowLayout {
-                            Layout.fillWidth: true
+                        // 💡 THE FIX: Swapped RowLayout for Row
+                        Row {
+                            width: parent.width
                             spacing: 12
                             
                             Rectangle {
                                 property string imageSource: resolveImage(notifDelegate.currentNotif.cachedImage || notifDelegate.currentNotif.image, notifDelegate.currentNotif.cachedAppIcon || notifDelegate.currentNotif.appIcon)
                                 visible: imageSource !== ""
-                                Layout.preferredWidth: visible ? 48 : 0  
-                                Layout.preferredHeight: visible ? 48 : 0
-                                Layout.alignment: Qt.AlignTop
+                                width: visible ? 48 : 0  
+                                height: visible ? 48 : 0
                                 radius: 8
                                 color: "transparent"
                                 clip: true
@@ -234,19 +230,23 @@ PanelWindow {
                                     source: parent.imageSource
                                     fillMode: Image.PreserveAspectFit
                                     asynchronous: true
-                                    sourceSize: Qt.size(128, 128)
+                                    
+                                    // 💡 THE FIX: Explicit integer sourceSize
+                                    sourceSize.width: 128
+                                    sourceSize.height: 128
+                                    
                                     onStatusChanged: if (status === Image.Error) parent.visible = false 
                                 }
                             }
 
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                Layout.alignment: Qt.AlignTop
+                            // 💡 THE FIX: Swapped ColumnLayout for Column
+                            Column {
+                                width: parent.width - (parent.children[0].visible ? 60 : 0) // Account for the spacer and icon
                                 spacing: 4
 
                                 Item {
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 20
+                                    width: parent.width
+                                    height: 20
                                     
                                     Text {
                                         anchors.left: parent.left
@@ -300,7 +300,7 @@ PanelWindow {
                                 }
 
                                 Text {
-                                    Layout.fillWidth: true
+                                    width: parent.width
                                     text: notifDelegate.currentNotif.summary || ""
                                     color: Colors.text
                                     font.pixelSize: 14
@@ -311,7 +311,7 @@ PanelWindow {
                                 }
 
                                 Text {
-                                    Layout.fillWidth: true
+                                    width: parent.width
                                     text: NotificationUtils.processNotificationBody(notifDelegate.currentNotif.body, notifDelegate.currentNotif.appName)
                                     color: Colors.text
                                     opacity: 0.8
@@ -334,8 +334,8 @@ PanelWindow {
 
                         // --- INLINE REPLY ---
                         Rectangle {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 32
+                            width: parent.width
+                            height: 32
                             visible: notifDelegate.currentNotif.notification && notifDelegate.currentNotif.notification.hasInlineReply
                             color: "transparent"
                             border.color: Colors.border
@@ -373,9 +373,10 @@ PanelWindow {
                         }
                         
                         // --- CUSTOM ACTIONS ---
-                        RowLayout {
+                        // 💡 THE FIX: Swapped RowLayout for Row
+                        Row {
                             spacing: 8
-                            Layout.fillWidth: true
+                            width: parent.width
                             visible: notifDelegate.customActions.length > 0 
                             
                             Repeater {
@@ -385,8 +386,10 @@ PanelWindow {
                                 delegate: Rectangle {
                                     required property var modelData 
                                     
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: 28
+                                    // 💡 THE FIX: Mathematical fixed widths instead of Layout bounds
+                                    width: (parent.width - (parent.spacing * (notifDelegate.customActions.length - 1))) / notifDelegate.customActions.length
+                                    height: 28
+                                    
                                     color: actionMouseArea.containsMouse ? Colors.text : "transparent"
                                     border.color: Colors.border
                                     border.width: 1
@@ -402,7 +405,11 @@ PanelWindow {
                                             source: visible ? resolveImage(modelData.identifier, "") : ""
                                             width: visible ? 14 : 0
                                             height: visible ? 14 : 0
-                                            sourceSize: Qt.size(14, 14)
+                                            
+                                            // 💡 THE FIX: Explicit integer sourceSize
+                                            sourceSize.width: 14
+                                            sourceSize.height: 14
+                                            
                                             fillMode: Image.PreserveAspectFit
                                         }
 
@@ -434,7 +441,7 @@ PanelWindow {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: parent.width * 0.85
-                        implicitHeight: 1
+                        height: 1
                         color: Colors.text
                         opacity: 0.1
                         visible: index < popupListView.count - 1 

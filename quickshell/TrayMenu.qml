@@ -10,7 +10,8 @@ Item {
 
     signal closeRequested()
 
-    implicitWidth: menuLayout.implicitWidth + 20
+    // 💡 RESTORED: Auto width and height based on the dynamic layout!
+    implicitWidth: menuLayout.implicitWidth 
     implicitHeight: menuLayout.implicitHeight + 12
 
     Shortcut {
@@ -23,6 +24,7 @@ Item {
         menu: menuRoot.activeItem ? menuRoot.activeItem.menu : null
     }
 
+    // 💡 RESTORED: ColumnLayout handles the max-width calculation natively
     ColumnLayout {
         id: menuLayout
         anchors.top: parent.top
@@ -37,8 +39,10 @@ Item {
             delegate: ColumnLayout {
                 id: topDelegate
                 required property var modelData
+                
                 Layout.fillWidth: true
                 spacing: 2
+                
                 property bool submenuExpanded: false
                 property string cleanText: modelData.text ? modelData.text.replace(/&/g, "") : ""
 
@@ -58,35 +62,51 @@ Item {
                     visible: !modelData.isSeparator
                     Layout.fillWidth: true
                     implicitHeight: 24
-                    implicitWidth: Math.max(160, menuContentRow.implicitWidth + 16)
+                    
+                    // 💡 RESTORED: Dynamically sizes based on the text width!
+                    implicitWidth: Math.max(160, mainText.contentWidth + 40)
+                    
                     color: itemMouseArea.containsMouse ? Colors.workspaceactive : "transparent"
                     radius: 3
 
-                    RowLayout {
-                        id: menuContentRow
+                    // Kept the primitive Item for the row to prevent the D-Bus CPU spikes
+                    Item {
                         anchors.fill: parent
                         anchors.leftMargin: 8
                         anchors.rightMargin: 8
-                        spacing: 8
                         opacity: (modelData.enabled !== undefined && !modelData.enabled) ? 0.5 : 1.0
 
                         Text {
+                            id: checkMark
                             text: "✓"
                             color: Colors.text
                             font.pixelSize: 11
                             visible: modelData.checked || false
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
                         }
+                        
                         Text {
-                            Layout.fillWidth: true
+                            id: mainText
                             text: topDelegate.cleanText
                             color: Colors.text
                             font.pixelSize: 11
+                            anchors.left: (modelData.checked || false) ? checkMark.right : parent.left
+                            anchors.leftMargin: (modelData.checked || false) ? 8 : 0
+                            anchors.right: arrowMark.visible ? arrowMark.left : parent.right
+                            anchors.rightMargin: arrowMark.visible ? 8 : 0
+                            anchors.verticalCenter: parent.verticalCenter
+                            elide: Text.ElideRight 
                         }
+                        
                         Text {
+                            id: arrowMark
                             visible: modelData.hasChildren || false
                             text: topDelegate.submenuExpanded ? "▾" : "▸"
                             color: Colors.text
                             font.pixelSize: 10
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
                         }
                     }
 
@@ -108,10 +128,7 @@ Item {
                     }
                 }
 
-                // --- Submenu Container: lazily loaded ---
-                // Loader only instantiates QsMenuOpener (and its D-Bus menu query)
-                // once the user actually expands this item, instead of eagerly
-                // for every item-with-children when the parent menu opens.
+                // --- Submenu Container ---
                 Loader {
                     Layout.fillWidth: true
                     active: topDelegate.submenuExpanded && (modelData.hasChildren || false)
@@ -146,11 +163,13 @@ Item {
                                 }
 
                                 Rectangle {
-                                    id: subItemRect
                                     visible: !modelData.isSeparator
                                     Layout.fillWidth: true
                                     implicitHeight: 24
-                                    implicitWidth: Math.max(160, subMenuText.implicitWidth + 36)
+                                    
+                                    // 💡 RESTORED: Dynamic submenu sizing
+                                    implicitWidth: Math.max(160, subMenuText.contentWidth + 40)
+                                    
                                     color: subItemMouseArea.containsMouse ? Colors.workspaceactive : "transparent"
                                     radius: 3
 
@@ -158,10 +177,13 @@ Item {
                                         id: subMenuText
                                         anchors.left: parent.left
                                         anchors.leftMargin: 20
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 8
                                         anchors.verticalCenter: parent.verticalCenter
-                                        text: subItemRect.parent.cleanText
+                                        text: parent.parent.cleanText 
                                         color: Colors.text
                                         font.pixelSize: 11
+                                        elide: Text.ElideRight
                                     }
 
                                     MouseArea {

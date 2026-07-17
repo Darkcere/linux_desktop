@@ -16,12 +16,14 @@ PanelWindow {
     implicitHeight: 46
     color: "transparent"
 
+    // 💡 THE FIX: Keep the window permanently mapped to bypass Hyprland buffer delays
+    visible: true
+
     property bool isMicEvent: displayMicMuted
     property bool timerActive: false
-    property bool osdReady: false   // guards against the initial async AudioService connection
+    property bool osdReady: false   
 
     property bool showOSD: displayMicMuted || timerActive
-    visible: showOSD
 
     property real displayVolume: AudioService.sink?.audio?.volume ?? 0
     property bool displayMuted: AudioService.sink?.audio?.muted ?? false
@@ -51,7 +53,7 @@ PanelWindow {
 
     Timer {
         id: readyTimer
-        interval: 800   // long enough for AudioService.sink/source to attach
+        interval: 800   
         repeat: false
         onTriggered: osdWindow.osdReady = true
     }
@@ -84,11 +86,19 @@ PanelWindow {
         }
 
         color: '#040e0d'
-        opacity: displayMicMuted ? 0.8 : 0.9
+        
+        // 💡 THE FIX: Bind the opacity to the state instead of the window's visibility
+        opacity: osdWindow.showOSD ? (osdWindow.displayMicMuted ? 0.8 : 0.9) : 0.0
+        
         border.color: osdWindow.displayMicMuted ? osdWindow.colorMutedBorder : Colors.border
         border.width: 2
         radius: 6
         clip: true 
+        
+        // 💡 Smooth fade in/out for the container
+        Behavior on opacity { 
+            NumberAnimation { duration: 150; easing.type: Easing.OutQuad } 
+        }
 
         // --- Speaker UI ---
         Item {
