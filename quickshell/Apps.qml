@@ -25,8 +25,6 @@ Item {
     // --- REFRESH APPS ON OPEN ---
     onIsOpenChanged: {
         if (isOpen) {
-            // OPTIMIZATION: Removed fetchAppsProcess.running = true from here.
-            // Spawning a whole python process on every toggle kills CPU.
             filterApps("")
             focusTimer.start()
         }
@@ -37,7 +35,6 @@ Item {
         onActivated: launcherWindow.closeRequested()
     }
 
-    // OPTIMIZATION: Added a manual refresh shortcut if you install something new
     Shortcut {
         sequence: "Ctrl+R"
         enabled: launcherWindow.isOpen
@@ -60,7 +57,6 @@ Item {
     property var usageCounts: JSON.parse(appSettings.usageData || "{}")
     property string actionPrefix: ">"
 
-
     function sortApps() {
         launcherWindow.allAppsData.sort((a, b) => {
             let countA = launcherWindow.usageCounts[a.name] || 0;
@@ -69,10 +65,79 @@ Item {
             return a.name.localeCompare(b.name);
         });
     }
+ 
+    // --- SAFE MATH EVALUATOR ---
+    function tryEvaluateMath(query) {
+        let q = query.trim();
+        let isExplicit = q.startsWith("=");
+        if (isExplicit) {
+            q = q.substring(1).trim();
+        }
+
+        if (!q) return null;
+
+        // Require at least one number AND (an operator OR a math function) when not prefixed with '='
+        let hasOperatorOrFunc = /[+\-*/^%]|\b(sqrt|sin|cos|tan|log|abs|round|floor|ceil|pow|min|max|PI|E)\b/i.test(q);
+        if (!isExplicit && (!/\d/.test(q) || !hasOperatorOrFunc)) {
+            return null;
+        }
+
+        // Convert friendly syntax ('^' -> '**', 'pi' -> 'PI')
+        let expr = q.replace(/\^/g, "**").replace(/\bpi\b/gi, "PI");
+
+        // Safety check: strip all allowed math tokens. If any text remains, it's not a pure math expression.
+        let sanitized = expr
+            .replace(/\b(sqrt|sin|cos|tan|log|abs|round|floor|ceil|pow|min|max|PI|E)\b/g, "")
+            .replace(/[0-9+\-*/%.() \t\n\r]/g, "");
+
+        if (sanitized.length > 0) {
+            return null;
+        }
+
+        try {
+            let fn = new Function(
+                "sqrt", "sin", "cos", "tan", "log", "abs", "round", "floor", "ceil", "pow", "min", "max", "PI", "E",
+                "return (" + expr + ");"
+            );
+            
+            let result = fn(
+                Math.sqrt, Math.sin, Math.cos, Math.tan, Math.log, Math.abs, Math.round, Math.floor, Math.ceil, Math.pow, Math.min, Math.max, Math.PI, Math.E
+            );
+
+            if (typeof result === "number" && !isNaN(result) && isFinite(result)) {
+                // Clean up floating-point precision errors (e.g. 0.1 + 0.2 -> 0.3)
+                let cleanResult = Number(Math.round(result + 'e10') + 'e-10');
+                return {
+                    name: "=  " + cleanResult,
+                    expression: q + " = " + cleanResult,
+                    command: String(cleanResult),
+                    icon: "accessories-calculator",
+                    isMath: true,
+                    resultValue: String(cleanResult)
+                };
+            }
+        } catch (e) {
+            // Silently ignore incomplete expressions while typing (e.g., "sqrt(")
+            return null;
+        }
+        return null;
+    }
 
     function launchApp(entry) {
         if (!entry) return;
         
+        // --- HANDLE MATH RESULT (COPY TO CLIPBOARD) ---
+        if (entry.isMath) {
+            console.debug("Copying math result to clipboard: " + entry.resultValue);
+            launcherWindow.closeRequested();
+            
+            // Works across Wayland (wl-copy) and X11 (xclip)
+            Quickshell.execDetached({
+                command: ["sh", "-c", "printf '%s' '" + entry.resultValue + "' | (wl-copy 2>/dev/null || xclip -selection clipboard 2>/dev/null)"]
+            });
+            return;
+        }
+
         let counts = launcherWindow.usageCounts;
         counts[entry.name] = (counts[entry.name] || 0) + 1;
         launcherWindow.usageCounts = counts;
@@ -83,6 +148,11 @@ Item {
         console.debug("Executing -> Name: " + entry.name + " | Dir: " + entry.workingDirectory + " | Uses: " + counts[entry.name]);
         
         let cmdArgs = (entry.command || entry.name).split(" ").filter(Boolean);
+        
+        if (entry.terminal) {
+            cmdArgs.unshift("foot");
+        }
+
         Quickshell.execDetached({ 
             command: cmdArgs, 
             workingDirectory: entry.workingDirectory || "/"
@@ -101,13 +171,14 @@ Item {
             "    for p in file_list:\n" +
             "        try:\n" +
             "            with open(p, 'r', encoding='utf-8') as f:\n" +
-            "                app = {'name':'', 'command':'', 'icon':'', 'workingDirectory':'', 'nodisplay':False}\n" +
+            "                app = {'name':'', 'command':'', 'icon':'', 'workingDirectory':'', 'nodisplay':False, 'terminal':False}\n" +
             "                for line in f:\n" +
             "                    if line.startswith('Name=') and not app['name']: app['name'] = line[5:].strip().replace('\"', '')\n" +
             "                    elif line.startswith('Exec=') and not app['command']: app['command'] = line[5:].split(' %')[0].split(' @@')[0].strip().replace('\"', '')\n" +
             "                    elif line.startswith('Icon=') and not app['icon']: app['icon'] = line[5:].strip().replace('\"', '')\n" +
             "                    elif line.startswith('Path=') and not app['workingDirectory']: app['workingDirectory'] = line[5:].strip().replace('\"', '')\n" +
             "                    elif line.startswith('NoDisplay=') and line[10:].strip().lower() == 'true': app['nodisplay'] = True\n" +
+            "                    elif line.startswith('Terminal=') and line[9:].strip().lower() == 'true': app['terminal'] = True\n" +
             "                if app['name'] and app['command'] and not app['nodisplay'] and app['name'] not in seen_names:\n" +
             "                    del app['nodisplay']\n" +
             "                    apps.append(app)\n" +
@@ -151,6 +222,14 @@ Item {
 
         let lowerQuery = query.toLowerCase();
         
+        // 1. Check if the input is a valid math expression
+        let mathResult = tryEvaluateMath(query);
+        let results = [];
+        
+        if (mathResult) {
+            results.push(mathResult);
+        }
+
         let nameStartsWith = [];
         let cmdStartsWith = [];
         let nameContains = [];
@@ -172,8 +251,8 @@ Item {
             }
         }
         
-        // 💡 THE FIX: Just assign the array. The ListView will update automatically.
-        launcherWindow.currentApps = nameStartsWith.concat(cmdStartsWith, nameContains, cmdContains); 
+        // 2. Prepend math result at the very top of the list
+        launcherWindow.currentApps = results.concat(nameStartsWith, cmdStartsWith, nameContains, cmdContains); 
     }
 
     Column {
@@ -199,7 +278,7 @@ Item {
                 focus: true 
                 
                 Text {
-                    text: "Search Apps... (Ctrl+R to refresh cache)"
+                    text: "Search Apps or Math (e.g. 5+10*2, sqrt(64))..."
                     color: Colors.workspaceactive
                     opacity: 0.4
                     font.pixelSize: 16
@@ -257,10 +336,7 @@ Item {
             width: parent.width
             height: parent.height - 60 
             clip: true
-            
-            // 💡 THE FIX: Bind directly to the JS array!
             model: launcherWindow.currentApps 
-            
             currentIndex: launcherWindow.selectedIndex
             spacing: 5
 
@@ -290,14 +366,10 @@ Item {
                         Image {
                             id: appIconImg
                             anchors.fill: parent
-                            
-                            // 💡 Use modelData when iterating raw arrays
                             source: modelData.icon ? ("image://icon/" + modelData.icon) : ""
                             fillMode: Image.PreserveAspectFit
-                            
                             sourceSize.width: 36
                             sourceSize.height: 36
-                            
                             onStatusChanged: { if (status === Image.Error) visible = false; }
                         }
 
@@ -309,8 +381,7 @@ Item {
                             
                             Text {
                                 anchors.centerIn: parent
-                                // 💡 Use modelData
-                                text: modelData.name ? modelData.name[0] : "?" 
+                                text: modelData.isMath ? "=" : (modelData.name ? modelData.name[0] : "?")
                                 color: (appMouseArea.containsMouse || appsList.currentIndex === index) ? Colors.background : Colors.text
                                 font.pixelSize: 18
                                 font.bold: true
@@ -318,18 +389,32 @@ Item {
                         }
                     }
 
+                    // Main Label (App Name or Math Result)
                     Text {
-                        // 💡 Use modelData
+                        id: mainTextLabel
                         text: modelData.name
                         color: (appMouseArea.containsMouse || appsList.currentIndex === index) ? Colors.background : Colors.text
-                        font.pixelSize: 15
-                        font.bold: (appMouseArea.containsMouse || appsList.currentIndex === index)
+                        font.pixelSize: modelData.isMath ? 18 : 15
+                        font.bold: (appMouseArea.containsMouse || appsList.currentIndex === index) || modelData.isMath
                         anchors.left: iconContainer.right
                         anchors.leftMargin: 15
+                        anchors.right: subtitleText.visible ? subtitleText.left : parent.right
+                        anchors.rightMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        elide: Text.ElideRight
+                    }
+
+                    // Helper Text for Math Results ("Press Enter to copy")
+                    Text {
+                        id: subtitleText
+                        text: "Copy to clipboard"
+                        visible: Boolean(modelData.isMath)
+                        color: (appMouseArea.containsMouse || appsList.currentIndex === index) ? Colors.background : Colors.text
+                        opacity: 0.6
+                        font.pixelSize: 12
                         anchors.right: parent.right
                         anchors.rightMargin: 15
                         anchors.verticalCenter: parent.verticalCenter
-                        elide: Text.ElideRight
                     }
 
                     MouseArea {

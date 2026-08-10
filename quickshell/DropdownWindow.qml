@@ -10,7 +10,10 @@ PanelWindow {
     property string lastActiveView: ""
     property bool isBarVisible: false
     property var currentTrayItem: null
-    // --- DYNAMIC MORPHING DIMENSIONS ---
+
+    // 💡 THE LOCK: True whenever Polkit is actively prompting
+    property bool isPolkitLocked: root.activeView === "polkit"
+
     // --- DYNAMIC MORPHING DIMENSIONS ---
     property int currentDropWidth: {
         if (lastActiveView === "tray") return trayMenuView.item ? trayMenuView.item.implicitWidth : 600; 
@@ -19,9 +22,11 @@ PanelWindow {
         const widths = {
             "wallpaper": 950,
             "clipboard": 950,
-            "powermenu": 350,
+            "powermenu": 400,
             "audio": 450,
-            "notifications": 450
+            "notifications": 450,
+            "polkit": 420,
+            "tools": 520
         };
         // Return the mapped value, or default to 600
         return widths[lastActiveView] ?? 600;
@@ -33,10 +38,11 @@ PanelWindow {
         // Define a fast lookup table
         const heights = {
             "wallpaper": 500,
-            "tools": 630,
-            "powermenu": 360,
+            "tools": 570,
+            "powermenu": 420,
             "audio": 550,
-            "notifications": 550
+            "notifications": 550,
+            "polkit": 280
         };
         // Return the mapped value, or default to 450
         return heights[lastActiveView] ?? 450;
@@ -53,8 +59,14 @@ PanelWindow {
     onCloseRequested: {
         root.activeView = ""
     }
-    function toggleNotifications() { root.activeView = (root.activeView === "notifications") ? "" : "notifications" }
+
+    // 💡 THE FIX: Protected toggles - return early if Polkit is open!
+    function toggleNotifications() { 
+        if (isPolkitLocked) return; 
+        root.activeView = (root.activeView === "notifications") ? "" : "notifications" 
+    }
     function toggleTrayMenu(trayItem) {
+        if (isPolkitLocked) return;
         if (root.activeView === "tray" && root.currentTrayItem === trayItem) {
             root.closeRequested()
         } else {
@@ -63,9 +75,16 @@ PanelWindow {
         }
     }
     
-    function toggleApps() { root.activeView = (root.activeView === "apps") ? "" : "apps" }
-    function toggleWallpaperPicker() { root.activeView = (root.activeView === "wallpaper") ? "" : "wallpaper" }
+    function toggleApps() { 
+        if (isPolkitLocked) return; 
+        root.activeView = (root.activeView === "apps") ? "" : "apps" 
+    }
+    function toggleWallpaperPicker() { 
+        if (isPolkitLocked) return; 
+        root.activeView = (root.activeView === "wallpaper") ? "" : "wallpaper" 
+    }
     function openWallpaperPicker() {
+        if (isPolkitLocked) return;
         if (root.activeView === "wallpaper") {
             if (wallpaperPickerLoader.item) {
                 wallpaperPickerLoader.item.rollRandomWallpaper()
@@ -74,12 +93,27 @@ PanelWindow {
             root.activeView = "wallpaper"
         }
     }
-    function togglePowerMenu() { root.activeView = (root.activeView === "powermenu") ? "" : "powermenu" }
-    function toggleClipboard() { root.activeView = (root.activeView === "clipboard") ? "" : "clipboard" }
-    function toggleTools() { root.activeView = (root.activeView === "tools") ? "" : "tools" }
-    function toggleAudio() { root.activeView = (root.activeView === "audio") ? "" : "audio" }
+    function togglePowerMenu() { 
+        if (isPolkitLocked) return; 
+        root.activeView = (root.activeView === "powermenu") ? "" : "powermenu" 
+    }
+    function toggleClipboard() { 
+        if (isPolkitLocked) return; 
+        root.activeView = (root.activeView === "clipboard") ? "" : "clipboard" 
+    }
+    function toggleTools() { 
+        if (isPolkitLocked) return; 
+        root.activeView = (root.activeView === "tools") ? "" : "tools" 
+    }
+    function toggleAudio() { 
+        if (isPolkitLocked) return; 
+        root.activeView = (root.activeView === "audio") ? "" : "audio" 
+    }
 
-    
+    // 💡 POLKIT STATE HELPERS
+    // Only PolkitDialog can call openPolkit/closePolkit
+    function openPolkit() { root.activeView = "polkit" }
+    function closePolkit() { if (root.activeView === "polkit") root.closeRequested() }
 
     anchors { top: true; left: true; right: true; bottom: true }
     color: "transparent"
@@ -92,7 +126,12 @@ PanelWindow {
     MouseArea { 
         anchors.fill: parent
         enabled: root.isOpen
-        onClicked: root.closeRequested() 
+        onClicked: {
+            // 💡 THE FIX: Prevent accidental outside-click closing while Polkit is open
+            if (!root.isPolkitLocked) {
+                root.closeRequested()
+            }
+        }
     }
 
     Rectangle {
@@ -235,6 +274,23 @@ PanelWindow {
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
                     sourceComponent: Component {
                         NotificationCenter { isOpen: root.activeView === "notifications"; onCloseRequested: root.closeRequested() }
+                    }
+                }
+
+                // 💡 THE FIX: Integrated PolkitDialog Loader
+                // Keeps PolkitAgent active in the background so it catches authentication requests
+                Loader {
+                    anchors.fill: parent
+                    active: true
+                    opacity: root.activeView === "polkit" ? 1 : 0
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
+                    sourceComponent: Component {
+                        PolkitDialog { 
+                            isOpen: root.activeView === "polkit"
+                            onOpenRequested: root.openPolkit()
+                            onCloseRequested: root.closePolkit()
+                        }
                     }
                 }
             }

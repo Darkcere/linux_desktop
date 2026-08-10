@@ -55,7 +55,7 @@ PanelWindow {
         clip: true 
 
         Behavior on width { NumberAnimation { duration: menuHandler ? menuHandler.morphSpeed : 300; easing.type: Easing.OutQuart } }
-        Behavior on radius { NumberAnimation { duration: menuHandler ? menuHandler.morphSpeed : 200; easing.type: Easing.OutQuart } }
+        Behavior on radius { NumberAnimation { duration: menuHandler ? menuHandler.morphSpeed : 300; easing.type: Easing.OutQuart } }
 
         // --- 1. DROPDOWN BRIDGE ---
         Rectangle {
@@ -118,134 +118,146 @@ PanelWindow {
                 anchors.rightMargin: 9
                 
                 // --- LEFT ROW ---
-                Row {
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 8 
-                    
-                    opacity: menuHandler && menuHandler.activeView ? 0 : 1
-                    visible: opacity > 0 
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                    
-                    Text {
-                        id: archlogo
-                        text: "󰣇"
-                        color: Colors.text
-                        font.pixelSize: 14
-                        anchors.verticalCenter: parent.verticalCenter
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                        
-                        // 💡 THE FIX: Zero-geometry input handling
-                        HoverHandler {
-                            id: archHover
-                            cursorShape: Qt.PointingHandCursor
-                        }
-                        TapHandler {
-                            onTapped: mainBarWindow.toggleLauncherRequested()
-                        }
-                    }
-                    
-                    Workspaces { anchors.verticalCenter: parent.verticalCenter }
-                }
-
-                // --- CENTER ROW ---
-                Row {
-                    anchors.centerIn: parent
-                    spacing: 5 
-                    
-                    opacity: mainBarWindow.isRightMenuOpen ? 0 : 1
-                    visible: opacity > 0 
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                    
-                    Clock { z: -1; anchors.verticalCenter: parent.verticalCenter }
-                    Mediaplayer { z: 10; anchors.verticalCenter: parent.verticalCenter }
-                }
-
-                // --- RIGHT ROW ---
-                Row {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 5 
-                    
-                    // --- 1. AUDIO ---
-                    AudioModule {
-                        property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "audio")
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: isActive ? implicitWidth : 0
-                        opacity: isActive ? 1 : 0
-                        clip: true 
-                        visible: width > 0 
-                        
-                        Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
-                    }
-                    
-                    // --- 2. NOTIFICATIONS ---
-                    Text {
-                        id: notificationbell
-                        property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "notifications")
-                        
-                        text: NotificationManager.silent ? "" : (hasNotifications ? "" : "")
-                        color: Colors.text 
-                        font.pixelSize: 14
-                        anchors.verticalCenter: parent.verticalCenter
-                        
-                        width: isActive ? implicitWidth : 0
-                        opacity: isActive ? 1 : 0
-                        clip: true 
-                        visible: width > 0
-                        
-                        Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
-                        
-                        // 💡 THE FIX: Zero-geometry right/left click separation
-                        HoverHandler {
-                            id: bellHover
-                            cursorShape: Qt.PointingHandCursor
-                        }
-                        TapHandler {
-                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            onTapped: (eventPoint, button) => {
-                                if (button === Qt.RightButton) {
-                                    NotificationManager.silent = !NotificationManager.silent;
-                                } else {
-                                    mainBarWindow.menuHandler.toggleNotifications();
+                Loader {
+                    id:leftRowbar
+                    anchors.fill: parent
+                    active: !menuHandler?.activeView 
+                    sourceComponent: Component {
+                        Row {
+                            spacing: 8 
+                            
+                            Behavior on opacity { NumberAnimation { duration: 150 } }
+                            
+                            Text {
+                                id: archlogo
+                                text: "󰣇"
+                                color: Colors.text
+                                font.pixelSize: 14
+                                anchors.verticalCenter: parent.verticalCenter
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                                
+                                // 💡 THE FIX: Zero-geometry input handling
+                                HoverHandler {
+                                    id: archHover
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+                                TapHandler {
+                                    onTapped: mainBarWindow.toggleLauncherRequested()
+                                }
+                                BarToolTip {
+                                    targetItem: archlogo
+                                    active: archHover.hovered
+                                    text: "Open Launcher"
+                                    topMargin: 24
                                 }
                             }
+                            
+                            Workspaces { anchors.verticalCenter: parent.verticalCenter }
                         }
                     }
+                }
+                
+                
+                // --- CENTER ROW ---
+                Loader {
+                    anchors.centerIn: parent
+                    active: !mainBarWindow.isRightMenuOpen 
                     
-                    // --- 3. TRAY ---
-                    Tray { 
-                        property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "tray")
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: isActive ? implicitWidth : 0
-                        opacity: isActive ? 1 : 0
-                        clip: true 
-                        visible: width > 0 
-                        
-                        Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
-                        
-                        menuHandler: mainBarWindow.menuHandler
+                    sourceComponent: Component {
+                        Row {
+                            spacing: 5 
+                            Behavior on opacity { NumberAnimation { duration: 150 } }
+                            
+                            Clock { z: -1; anchors.verticalCenter: parent.verticalCenter }
+                            Mediaplayer { z: 10; anchors.verticalCenter: parent.verticalCenter }
+                        }
+                    }
+                }
+                // --- RIGHT ROW ---
+                Loader {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    active: mainBarWindow.isRightMenuOpen || !menuHandler?.activeView 
+                    sourceComponent: Component {
+                        Row {
+                            spacing: 5 
+                            
+                            // --- 1. AUDIO ---
+                            AudioModule {
+                                property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "audio")
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: isActive ? implicitWidth : 0
+                                opacity: isActive ? 1 : 0
+                                clip: true 
+                                visible: width > 0 
+                                
+                                Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
+                                Behavior on opacity { NumberAnimation { duration: 150 } }
+                            }
+                            
+                            // --- 2. NOTIFICATIONS ---
+                            Text {
+                                id: notificationbell
+                                property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "notifications")
+                                
+                                text: NotificationManager.silent 
+                                ? (hasNotifications ? "" : "") 
+                                : (hasNotifications ? "" : "")
+                                color: Colors.text 
+                                font.pixelSize: 14
+                                anchors.verticalCenter: parent.verticalCenter
+                                
+                                width: isActive ? implicitWidth : 0
+                                opacity: isActive ? 1 : 0
+                                clip: true 
+                                visible: width > 0
+                                
+                                Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
+                                Behavior on opacity { NumberAnimation { duration: 150 } }
+                                
+                                // 💡 THE FIX: Zero-geometry right/left click separation
+                                HoverHandler {
+                                    id: bellHover
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+                                TapHandler {
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onTapped: (eventPoint, button) => {
+                                        if (button === Qt.RightButton) {
+                                            NotificationManager.silent = !NotificationManager.silent;
+                                        } else {
+                                            mainBarWindow.menuHandler.toggleNotifications();
+                                        }
+                                    }
+                                }
+
+                                BarToolTip {
+                                    targetItem: notificationbell
+                                    active: bellHover.hovered
+                                    text: "Left Click: Open Notification Center\nRight Click: Toggle DND"
+                                    topMargin: 24 
+                                }
+                            }
+                            
+                            // --- 3. TRAY ---
+                            Tray { 
+                                property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "tray")
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: isActive ? implicitWidth : 0
+                                opacity: isActive ? 1 : 0
+                                clip: true 
+                                visible: width > 0 
+                                
+                                Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
+                                Behavior on opacity { NumberAnimation { duration: 150 } }
+                                
+                                menuHandler: mainBarWindow.menuHandler
+                            }
+                        }
                     }
                 }
             }
         }
     }
-    
-    // 💡 THE FIX: Connected to the new HoverHandlers
-    BarToolTip {
-        targetItem: archlogo
-        active: archHover.hovered
-        text: "Open Launcher"
-        topMargin: 24
-    }
 
-    BarToolTip {
-        targetItem: notificationbell
-        active: bellHover.hovered
-        text: "Left Click: Open Notification Center\nRight Click: Toggle DND"
-        topMargin: 24 
-    }
 }

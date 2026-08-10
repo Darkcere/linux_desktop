@@ -24,7 +24,6 @@ Item {
     readonly property var menuData: {
         "menu_main": [
             { name: "Game Mode", iconStr: "", action: "gamemode" },
-            { name: "Toggle HDR", iconStr: "󰹑", action: "hdr" },
             { name: "Layouts", iconStr: "󰕰", action: "menu_layouts" },
             { name: "Screenshare Privacy", iconStr: "󰈈", action: "privacy" },
             { name: "Screenshot Menu", iconStr: "", action: "menu_screenshot" },
@@ -135,9 +134,6 @@ EOF
         
         switch (action) {
             case "gamemode": cmd = `bash ${scriptsDir}gamemode.sh &`; break;
-            case "hdr": 
-                cmd = `preset=$(hyprctl monitors all | awk -F': ' '/colorManagementPreset/ {print $2; exit}'); if [[ "$preset" == "hdr" ]]; then hyprctl keyword monitor ",highrr,auto,1"; else hyprctl keyword monitor ",highrr,auto,1,bitdepth,10,cm,hdr,sdrbrightness,5"; fi`; 
-                break;
             case "privacy": cmd = `hyprctl dispatch setprop active no_screen_share toggle`; break;
             case "screenrecord": cmd = `nohup bash ${scriptsDir}screenrecord.sh > /dev/null 2>&1 & disown`; break;
             case "open_rec": cmd = `xdg-open "\${XDG_VIDEOS_DIR:-$HOME/Videos}/Recordings" &`; break;

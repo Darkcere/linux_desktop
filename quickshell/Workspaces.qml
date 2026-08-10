@@ -47,6 +47,10 @@ Row {
                 hoverEnabled: true 
                 cursorShape: Qt.PointingHandCursor
                 onClicked: Hyprland.dispatch("workspace " + wsId)
+                onWheel: (wheel) => {
+                    if (wheel.angleDelta.y > 0) Hyprland.dispatch("workspace -1");
+                    else if (wheel.angleDelta.y < 0) Hyprland.dispatch("workspace +1");
+                }
             }
         }
     }
@@ -86,6 +90,10 @@ Row {
                 hoverEnabled: true 
                 cursorShape: Qt.PointingHandCursor
                 onClicked: Hyprland.dispatch("workspace " + ws.id)
+                onWheel: (wheel) => {
+                    if (wheel.angleDelta.y > 0) Hyprland.dispatch("workspace -1");
+                    else if (wheel.angleDelta.y < 0) Hyprland.dispatch("workspace +1");
+                }
             }
         }
     }

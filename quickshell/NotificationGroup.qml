@@ -353,6 +353,16 @@ Item {
                                 border.width: 1
                                 radius: 6
 
+                                // 💡 THE FIX: Traps the click so the group background doesn't steal focus
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.IBeamCursor
+                                    onClicked: {
+                                        replyInput.forceActiveFocus();
+                                        mouse.accepted = true;
+                                    }
+                                }
+
                                 TextInput {
                                     id: replyInput
                                     anchors.fill: parent
@@ -361,6 +371,9 @@ Item {
                                     color: Colors.text
                                     font.pixelSize: 12
                                     clip: true
+                                    
+                                    // 💡 THE FIX: Allows text highlighting
+                                    selectByMouse: true 
                                     
                                     Text {
                                         anchors.fill: parent
@@ -374,9 +387,15 @@ Item {
 
                                     onAccepted: {
                                         if (text.trim() !== "") {
-                                            if (groupItemDelegate.currentNotif.notification.reply) {
-                                                groupItemDelegate.currentNotif.notification.reply(text);
-                                            }
+                                            // 1. Force the signal onto the bus manually (Bulletproof bypass)
+                                            let safeText = text.replace(/"/g, '\\"');
+                                            let dbusCmd = `dbus-send --session --type=signal / org.freedesktop.Notifications.NotificationReplied uint32:${groupItemDelegate.currentNotif.id} string:"${safeText}"`;
+                                            Quickshell.execDetached({ command: ["bash", "-c", dbusCmd] });
+
+                                            // 2. Clear the input box 
+                                            replyInput.text = "";
+
+                                            // 3. Instantly dismiss the notification
                                             NotificationManager.discardNotification(groupItemDelegate.currentNotif.id);
                                         }
                                     }

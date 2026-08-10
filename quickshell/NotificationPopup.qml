@@ -9,7 +9,8 @@ PanelWindow {
     id: popupWindow
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "popups"
-
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+    
     property bool isBarVisible: true 
     
     // 💡 THE NEW OFFSET TRACKER
@@ -25,11 +26,11 @@ PanelWindow {
     Behavior on margins.top { NumberAnimation { duration: 300; easing.type: Easing.OutQuart } }
 
     width: 348
-    height: visualBox.height 
+    height: visualBox.height
     color: "transparent"
     
     property bool hasNotifications: NotificationManager.popupList.length > 0
-    visible: hasNotifications
+    visible: true
 
     // --- Image Resolver ---
     function resolveImage(imageStr, iconStr) {
@@ -63,13 +64,22 @@ PanelWindow {
                     return;
                 }
 
-                let timeout = 7000; 
+                let timeout = 10000; 
                 if (notif.notification) {
                     let urg = notif.notification.urgency;
-                    if (urg === NotificationUrgency.Critical) timeout = 0; 
-                    else if (urg === NotificationUrgency.Low) timeout = 3000; 
-                }
+                    let expireMs = notif.notification.expireTimeout;
 
+                    // 1. Check if a custom timeout was provided.
+                    // In D-Bus, 0 means "never expire", > 0 means a specific duration (in milliseconds), -1 means default.
+                    if (expireMs !== undefined && expireMs >= 0) {
+                        timeout = expireMs; // Use the exact milliseconds provided by notify-send
+                    } 
+                    // 2. Otherwise (if -1 or undefined), fall back to urgency defaults
+                    else {
+                        if (urg === NotificationUrgency.Critical) timeout = 0; 
+                        else if (urg === NotificationUrgency.Low) timeout = 5000; 
+                    }
+                }
                 if (timeout > 0 && (now - state.start) >= timeout) {
                     notif.popup = false;
                     changed = true;
@@ -88,14 +98,14 @@ PanelWindow {
     Rectangle {
         id: visualBox
         width: parent.width
-        height: hasNotifications ? popupListView.contentHeight + 20 : 0
+        height: hasNotifications ? popupListView.contentHeight + 10 + (popupWindow.isBarVisible ? 0 : 10) : 0
         opacity: hasNotifications ? 1 : 0
         color: Colors.background 
         border.color: Colors.border
         border.width: 2
         radius: 12
         clip: true
-
+        
         Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
         Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.InOutQuad } }
 
@@ -114,6 +124,7 @@ PanelWindow {
             anchors.fill: parent
             anchors.leftMargin: 10
             anchors.rightMargin: 10
+            anchors.topMargin: popupWindow.isBarVisible ? 0 : 10
             spacing: 5
             
             interactive: false 
@@ -342,6 +353,16 @@ PanelWindow {
                             border.width: 1
                             radius: 6
 
+                            // 💡 ADD THIS: Catches the click so the main notification card doesn't steal it
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.IBeamCursor
+                                onClicked: {
+                                    replyInput.forceActiveFocus();
+                                    mouse.accepted = true; // Stops the click from bubbling up
+                                }
+                            }
+
                             TextInput {
                                 id: replyInput
                                 anchors.fill: parent
@@ -350,6 +371,9 @@ PanelWindow {
                                 color: Colors.text
                                 font.pixelSize: 12
                                 clip: true
+                                
+                                // 💡 ADD THIS: Allows you to click into the text and highlight it
+                                selectByMouse: true 
                                 
                                 Text {
                                     anchors.fill: parent
@@ -363,9 +387,15 @@ PanelWindow {
 
                                 onAccepted: {
                                     if (text.trim() !== "") {
-                                        if (notifDelegate.currentNotif.notification.reply) {
-                                            notifDelegate.currentNotif.notification.reply(text);
-                                        }
+                                        // 1. Force the signal onto the bus manually
+                                        let safeText = text.replace(/"/g, '\\"');
+                                        let dbusCmd = `dbus-send --session --type=signal / org.freedesktop.Notifications.NotificationReplied uint32:${notifDelegate.currentNotif.id} string:"${safeText}"`;
+                                        Quickshell.execDetached({ command: ["bash", "-c", dbusCmd] });
+
+                                        // 2. Clear the input box 
+                                        replyInput.text = "";
+
+                                        // 3. Instantly dismiss the notification
                                         NotificationManager.discardNotification(notifDelegate.currentNotif.id);
                                     }
                                 }

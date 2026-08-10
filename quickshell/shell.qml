@@ -5,7 +5,6 @@ import QtQuick
 
 ShellRoot {
     id: root
-    
     Connections {
         target: Hyprland
         function onRawEvent(event) {
@@ -23,28 +22,43 @@ ShellRoot {
         return active?.lastIpcObject?.fullscreen === 2;
     }
 
-    property bool isRightMenuOpen: dropdownManager.isOpen && 
-                                   (dropdownManager.activeView === "tray" || 
-                                    dropdownManager.activeView === "audio" || 
-                                    dropdownManager.activeView === "notifications")
+    property bool isRightMenuOpen: {
+        let menu = dropdownLoader.item;
+        if (!menu) return false;
+        return menu.isOpen && (menu.activeView === "tray" || menu.activeView === "audio" || menu.activeView === "notifications");
+    }
 
     // 💡 THE FIX: Safe root property to track the Bar state!
     property bool isBarActive: true
+    // 💡 THE FIX: A reactive token to safely trigger updates across Loaders
+    property string wallpaperToken: ""
 
-    GlobalShortcut { name: "toggleTools"; onPressed: dropdownManager.toggleTools() }
-    GlobalShortcut { name: "togglePowerMenu"; onPressed: dropdownManager.togglePowerMenu() }
-    GlobalShortcut { name: "toggleClipboard"; onPressed: dropdownManager.toggleClipboard() }
-    GlobalShortcut { name: "toggleLauncher"; onPressed: dropdownManager.toggleApps() }
-    GlobalShortcut { name: "toggleWallpaperPicker"; onPressed: dropdownManager.openWallpaperPicker() }
-    GlobalShortcut { name: "toggleAudioMenu"; onPressed: dropdownManager.toggleAudio() }
-    GlobalShortcut { name: "toggleNotifications"; onPressed: dropdownManager.toggleNotifications() }
+    // 💡 THE FIX: Moved the Bash execution to the root so it never gets blocked
+    function applySystemColors() {
+        let colorCmd = `matugen --source-color-index 0 image "$HOME/.current.wall" -t scheme-content && sh "$HOME/.config/hypr/scripts/colors_mqtt.sh"`;
+        Quickshell.execDetached({ command: ["bash", "-c", colorCmd] });
+    }
+    // 💡 THE FIX: Use dropdownLoader.item to force the load if pressed early
+    GlobalShortcut { name: "toggleTools"; onPressed: dropdownLoader.item.toggleTools() }
+    GlobalShortcut { name: "togglePowerMenu"; onPressed: dropdownLoader.item.togglePowerMenu() }
+    GlobalShortcut { name: "toggleClipboard"; onPressed: dropdownLoader.item.toggleClipboard() }
+    GlobalShortcut { name: "toggleLauncher"; onPressed: dropdownLoader.item.toggleApps() }
+    GlobalShortcut { name: "toggleWallpaperPicker"; onPressed: dropdownLoader.item.openWallpaperPicker() }
+    GlobalShortcut { name: "toggleAudioMenu"; onPressed: dropdownLoader.item.toggleAudio() }
+    GlobalShortcut { name: "toggleNotifications"; onPressed: dropdownLoader.item.toggleNotifications() }
     
     GlobalShortcut {
         name: "toggleBar"
         // 💡 THE FIX: Toggle the root property, not the window directly
         onPressed: root.isBarActive = !root.isBarActive
     }
-    
+    GlobalShortcut {
+        name: "updateWallpaper"
+        onPressed: {
+            root.applySystemColors();
+            root.wallpaperToken = Date.now().toString();
+        }
+    }
     Connections {
         target: Quickshell
         function onReloadCompleted() { Quickshell.inhibitReloadPopup() }
@@ -57,112 +71,107 @@ ShellRoot {
         active: root.isBarActive && !root.realFullscreen
         sourceComponent: Component {
             Bar {
-                menuHandler: dropdownManager 
-                isDropdownOpen: dropdownManager.isOpen 
-                dropdownWidth: dropdownManager.currentDropWidth
-                onToggleLauncherRequested: dropdownManager.toggleApps()
+                menuHandler: dropdownLoader.item 
+                isDropdownOpen: dropdownLoader.item?.isOpen ?? false
+                dropdownWidth: dropdownLoader.item?.currentDropWidth ?? 0
+                onToggleLauncherRequested: dropdownLoader.item?.toggleApps()
             }
         }
     }
-
-    NotificationPopup {
-        id: popups
-        // 💡 THE FIX: Bind to the safe root property
-        isBarVisible: !root.realFullscreen && root.isBarActive
-        dropdownOffset: root.isRightMenuOpen ? (dropdownManager.currentDropHeight + 10) : 0
-    }
-
-    DropdownWindow {
-        id: dropdownManager
-        // 💡 THE FIX: Bind to the safe root property
-        isBarVisible: !root.realFullscreen && root.isBarActive
-    }
-    
-    Osd {
-        id: volumeOSD
-    }
-
-    // --- YOUR WALLPAPER BACKGROUND ---
-    PanelWindow {
-        id: wallpaperWindow
-        anchors { top: true; bottom: true; left: true; right: true }
-        WlrLayershell.layer: WlrLayer.Background
-        exclusionMode: ExclusionMode.Ignore
-
-        GlobalShortcut {
-            name: "updateWallpaper"
-            onPressed: wallpaperContainer.refreshWallpaper()
+    LazyLoader {
+        id: popupsLoader
+        loading: true
+        NotificationPopup {
+            id: popups
+            isBarVisible: !root.realFullscreen && root.isBarActive && !dropdownLoader.item?.isOpen
+            dropdownOffset: root.isRightMenuOpen ? ((dropdownLoader.item?.currentDropHeight ?? 0) + 10) : 0
         }
-
-        Item {
-            id: wallpaperContainer
-            anchors.fill: parent
-
-            property bool useFront: false
-
-            function refreshWallpaper() {
-                console.log("QUICKSHELL: Trigger signal received!")
-                let newUrl = "file:///home/duarte/.current.wall?t=" + Date.now()
-                if (useFront) { backImage.source = newUrl } 
-                else { frontImage.source = newUrl }
-            }
-
-            function applyColors() {
-                let colorCmd = `matugen --source-color-index 0 image "$HOME/.current.wall" -t scheme-content && sh "$HOME/.config/hypr/scripts/colors_mqtt.sh"`;
-                Quickshell.execDetached({ command: ["bash", "-c", colorCmd] });
-            }
-
-            Image {
-                id: backImage
+    }
+    LazyLoader {
+        id: dropdownLoader
+        loading: true // Boot in the background immediately
+        
+        DropdownWindow {
+            isBarVisible: !root.realFullscreen && root.isBarActive
+        }
+    }
+    LazyLoader {
+        id: osdloader
+        loading: true
+        Osd {
+            id: volumeOSD
+        }
+    }
+    LazyLoader {
+        id: wallpaperLoader
+        loading: !root.realFullscreen
+        PanelWindow {
+            anchors { top: true; bottom: true; left: true; right: true }
+            WlrLayershell.layer: WlrLayer.Background
+            exclusionMode: ExclusionMode.Ignore
+            Item {
+                id: wallpaperContainer
                 anchors.fill: parent
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: false 
-                sourceSize.width: parent.width
-                sourceSize.height: parent.height
-                source: "file:///home/duarte/.current.wall"
-                
-                onStatusChanged: {
-                    if (status === Image.Ready && wallpaperContainer.useFront) {
-                        console.log("QUICKSHELL: Back image ready, crossfading...")
-                        wallpaperContainer.useFront = false
-                        wallpaperContainer.applyColors() 
-                    }
-                }
-            }
-
-            Image {
-                id: frontImage
-                anchors.fill: parent
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: false 
-                sourceSize.width: parent.width
-                sourceSize.height: parent.height
-                source: ""
-                opacity: wallpaperContainer.useFront ? 1 : 0
-                
-                Behavior on opacity {
-                    NumberAnimation { 
-                        id: fadeAnim
-                        duration: 500; 
-                        easing.type: Easing.InOutQuad 
+                property bool useFront: false
+                // 💡 THE FIX: Safely listen to the root token for updates!
+                Connections {
+                    target: root
+                    function onWallpaperTokenChanged() {
+                        if (root.wallpaperToken === "init") return;
                         
-                        onStopped: {
-                            if (frontImage.opacity === 1) { backImage.source = "" } 
-                            else if (frontImage.opacity === 0) { frontImage.source = "" }
+                        let newUrl = "file://" + Quickshell.env("HOME") + "/.current.wall?t=" + root.wallpaperToken;
+                        if (wallpaperContainer.useFront) {
+                            backImage.source = newUrl;
+                        } else {
+                            frontImage.source = newUrl;
                         }
                     }
                 }
-
-                onStatusChanged: {
-                    if (status === Image.Ready && !wallpaperContainer.useFront && source !== "") {
-                        console.log("QUICKSHELL: Front image ready, crossfading...")
-                        wallpaperContainer.useFront = true
-                        wallpaperContainer.applyColors() 
+                Image {
+                    id: backImage
+                    anchors.fill: parent
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: false 
+                    sourceSize.width: parent.width
+                    sourceSize.height: parent.height
+                    source: "file://" + Quickshell.env("HOME") + "/.current.wall"
+                    
+                    onStatusChanged: {
+                        if (status === Image.Ready && wallpaperContainer.useFront) {
+                            wallpaperContainer.useFront = false;
+                        }
+                    }
+                }
+                Image {
+                    id: frontImage
+                    anchors.fill: parent
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: false 
+                    sourceSize.width: parent.width
+                    sourceSize.height: parent.height
+                    source: ""
+                    opacity: wallpaperContainer.useFront ? 1 : 0
+                    
+                    Behavior on opacity {
+                        NumberAnimation { 
+                            duration: 500; 
+                            easing.type: Easing.InOutQuad 
+                            onStopped: {
+                                if (frontImage.opacity === 1) { backImage.source = "" } 
+                                else if (frontImage.opacity === 0) { frontImage.source = "" }
+                            }
+                        }
+                    }
+                    onStatusChanged: {
+                        if (status === Image.Ready && !wallpaperContainer.useFront && source !== "") {
+                            wallpaperContainer.useFront = true;
+                        }
                     }
                 }
             }
         }
+    
     }
 }
