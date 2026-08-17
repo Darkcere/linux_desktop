@@ -115,7 +115,12 @@ PanelWindow {
     function openPolkit() { root.activeView = "polkit" }
     function closePolkit() { if (root.activeView === "polkit") root.closeRequested() }
 
-    anchors { top: true; left: true; right: true; bottom: true }
+    anchors { top: true; left: true; right: true }
+    height: isOpen ? root.currentDropHeight : 0
+    
+    // 💡 THE FIX: Prevent the window from pushing down underlying apps
+    exclusiveZone: 0
+
     color: "transparent"
     visible: isOpen || visualBox.opacity > 0.01 
 

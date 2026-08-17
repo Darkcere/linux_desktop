@@ -7,13 +7,17 @@ import "./notification_utils.js" as NotificationUtils
 
 PanelWindow {
     id: popupWindow
+    
+    // 💡 THE FIX: Explicitly receive the screen from the parent Loader
+    property var targetScreen
+    screen: targetScreen
+
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "popups"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
     
     property bool isBarVisible: true 
     
-    // 💡 THE NEW OFFSET TRACKER
     property int dropdownOffset: 0
 
     anchors { top: true; right: true }
@@ -30,7 +34,6 @@ PanelWindow {
     color: "transparent"
     
     property bool hasNotifications: NotificationManager.popupList.length > 0
-    visible: true
 
     // --- Image Resolver ---
     function resolveImage(imageStr, iconStr) {
@@ -69,12 +72,9 @@ PanelWindow {
                     let urg = notif.notification.urgency;
                     let expireMs = notif.notification.expireTimeout;
 
-                    // 1. Check if a custom timeout was provided.
-                    // In D-Bus, 0 means "never expire", > 0 means a specific duration (in milliseconds), -1 means default.
                     if (expireMs !== undefined && expireMs >= 0) {
-                        timeout = expireMs; // Use the exact milliseconds provided by notify-send
+                        timeout = expireMs; 
                     } 
-                    // 2. Otherwise (if -1 or undefined), fall back to urgency defaults
                     else {
                         if (urg === NotificationUrgency.Critical) timeout = 0; 
                         else if (urg === NotificationUrgency.Low) timeout = 5000; 
@@ -106,7 +106,6 @@ PanelWindow {
         radius: 12
         clip: true
         
-        Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
         Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.InOutQuad } }
 
         // Seamless Bridge
@@ -125,11 +124,12 @@ PanelWindow {
             anchors.leftMargin: 10
             anchors.rightMargin: 10
             anchors.topMargin: popupWindow.isBarVisible ? 0 : 10
+            anchors.bottomMargin: 10
             spacing: 5
             
             interactive: false 
-            model: NotificationManager.popupList.slice().reverse()
-            
+            model: NotificationManager.popupList
+            verticalLayoutDirection: ListView.BottomToTop
             displaced: Transition {
                 ParallelAnimation {
                     NumberAnimation { properties: "x,y"; duration: 200; easing.type: Easing.OutCubic }
@@ -212,7 +212,6 @@ PanelWindow {
                         }
                     }
 
-                    // 💡 THE FIX: Swapped ColumnLayout for Column
                     Column {
                         id: contentCol
                         anchors {
@@ -221,8 +220,6 @@ PanelWindow {
                         }
                         spacing: 10
 
-                        // --- MAIN CONTENT (Left Image, Right Column) ---
-                        // 💡 THE FIX: Swapped RowLayout for Row
                         Row {
                             width: parent.width
                             spacing: 12
@@ -241,18 +238,14 @@ PanelWindow {
                                     source: parent.imageSource
                                     fillMode: Image.PreserveAspectFit
                                     asynchronous: true
-                                    
-                                    // 💡 THE FIX: Explicit integer sourceSize
                                     sourceSize.width: 128
                                     sourceSize.height: 128
-                                    
                                     onStatusChanged: if (status === Image.Error) parent.visible = false 
                                 }
                             }
 
-                            // 💡 THE FIX: Swapped ColumnLayout for Column
                             Column {
-                                width: parent.width - (parent.children[0].visible ? 60 : 0) // Account for the spacer and icon
+                                width: parent.width - (parent.children[0].visible ? 60 : 0)
                                 spacing: 4
 
                                 Item {
@@ -343,7 +336,6 @@ PanelWindow {
                             }
                         }
 
-                        // --- INLINE REPLY ---
                         Rectangle {
                             width: parent.width
                             height: 32
@@ -353,13 +345,12 @@ PanelWindow {
                             border.width: 1
                             radius: 6
 
-                            // 💡 ADD THIS: Catches the click so the main notification card doesn't steal it
                             MouseArea {
                                 anchors.fill: parent
                                 cursorShape: Qt.IBeamCursor
                                 onClicked: {
                                     replyInput.forceActiveFocus();
-                                    mouse.accepted = true; // Stops the click from bubbling up
+                                    mouse.accepted = true; 
                                 }
                             }
 
@@ -371,8 +362,6 @@ PanelWindow {
                                 color: Colors.text
                                 font.pixelSize: 12
                                 clip: true
-                                
-                                // 💡 ADD THIS: Allows you to click into the text and highlight it
                                 selectByMouse: true 
                                 
                                 Text {
@@ -387,23 +376,16 @@ PanelWindow {
 
                                 onAccepted: {
                                     if (text.trim() !== "") {
-                                        // 1. Force the signal onto the bus manually
                                         let safeText = text.replace(/"/g, '\\"');
                                         let dbusCmd = `dbus-send --session --type=signal / org.freedesktop.Notifications.NotificationReplied uint32:${notifDelegate.currentNotif.id} string:"${safeText}"`;
                                         Quickshell.execDetached({ command: ["bash", "-c", dbusCmd] });
-
-                                        // 2. Clear the input box 
                                         replyInput.text = "";
-
-                                        // 3. Instantly dismiss the notification
                                         NotificationManager.discardNotification(notifDelegate.currentNotif.id);
                                     }
                                 }
                             }
                         }
                         
-                        // --- CUSTOM ACTIONS ---
-                        // 💡 THE FIX: Swapped RowLayout for Row
                         Row {
                             spacing: 8
                             width: parent.width
@@ -416,7 +398,6 @@ PanelWindow {
                                 delegate: Rectangle {
                                     required property var modelData 
                                     
-                                    // 💡 THE FIX: Mathematical fixed widths instead of Layout bounds
                                     width: (parent.width - (parent.spacing * (notifDelegate.customActions.length - 1))) / notifDelegate.customActions.length
                                     height: 28
                                     
@@ -435,11 +416,8 @@ PanelWindow {
                                             source: visible ? resolveImage(modelData.identifier, "") : ""
                                             width: visible ? 14 : 0
                                             height: visible ? 14 : 0
-                                            
-                                            // 💡 THE FIX: Explicit integer sourceSize
                                             sourceSize.width: 14
                                             sourceSize.height: 14
-                                            
                                             fillMode: Image.PreserveAspectFit
                                         }
 
@@ -466,7 +444,6 @@ PanelWindow {
                         }
                     }
                     
-                    // Separator Line
                     Rectangle {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter

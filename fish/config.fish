@@ -1,7 +1,10 @@
+fish_add_path ~/.cargo/bin
+
 alias windows="sudo umount /mnt/window && sudo ntfs-3g -o remove_hiberfile /dev/nvme0n1p3 /mnt/window/"
 alias vencord='sh -c "$(curl -sS https://raw.githubusercontent.com/Vendicated/VencordInstaller/main/install.sh)"'
 alias rpi="ssh server@192.168.1.246"
 alias debian="ssh server@192.168.1.247"
+alias camera-phone="$HOME/.config/hypr/scripts/camera-phone.sh"
 if status is-interactive
     set -g fish_greeting ""
     # Custom colours
