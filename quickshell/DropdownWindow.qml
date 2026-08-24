@@ -39,7 +39,7 @@ PanelWindow {
         const heights = {
             "wallpaper": 500,
             "tools": 570,
-            "powermenu": 420,
+            "powermenu": 360,
             "audio": 550,
             "notifications": 550,
             "polkit": 280

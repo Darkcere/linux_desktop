@@ -20,8 +20,7 @@ Item {
 
     // 🚀 OPTIMIZATION 1: Lightweight static JS array instead of heavy ListModel
     readonly property var powerModel: [
-        { name: "Suspend System", iconStr: "", cmd: "systemctl suspend" },
-        { name: "Steam Gamescope", iconStr: "", cmd: "echo 'gamescope' > ~/.cache/next-wayland-session && systemctl --user stop wayland-wm@*.service" }, 
+        { name: "Suspend System", iconStr: "", cmd: "systemctl suspend" }, 
         { name: "Power Off System", iconStr: "", cmd: "hyprshutdown -t 'Shutting down...' --post-cmd 'systemctl poweroff'" },
         { name: "Reboot System", iconStr: "", cmd: "hyprshutdown -t 'Restarting...' --post-cmd 'systemctl reboot'" },
         { name: "Lock Session", iconStr: "", cmd: "loginctl lock-session" },
