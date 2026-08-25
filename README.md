@@ -165,9 +165,3 @@ wireguard-tools
 wl-clipboard
 xdg-desktop-portal-gtk 
 zen-browser-bin 
-pamixer
-wayvnc
-cliphist
-matugen-bin
-adw-gtk-theme
-

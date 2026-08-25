@@ -105,17 +105,7 @@ ShellRoot {
         onPressed: settingsLoader.item?.toggle() 
     }
     
-    // Load the separate window file
-    LazyLoader {
-        id: settingsLoader
-        loading: true
-        
-        // This refers directly to your SettingsWindow.qml file
-        SettingsWindow {
-            config: shellSettings 
-        }
-    }
-    GlobalShortcut { name: "toggleTools"; onPressed: dropdownLoader.item?.toggleTools() }
+        GlobalShortcut { name: "toggleTools"; onPressed: dropdownLoader.item?.toggleTools() }
     GlobalShortcut { name: "togglePowerMenu"; onPressed: dropdownLoader.item?.togglePowerMenu() }
     GlobalShortcut { name: "toggleClipboard"; onPressed: dropdownLoader.item?.toggleClipboard() }
     GlobalShortcut { name: "toggleLauncher"; onPressed: dropdownLoader.item?.toggleApps() }
@@ -148,9 +138,6 @@ ShellRoot {
                 onToggleLauncherRequested: dropdownLoader.item?.toggleApps()
             }
         }
-    }
-    Lock {
-        id: systemLock
     }
     
     // Add a GlobalShortcut or custom function to trigger the lock manually

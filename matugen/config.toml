@@ -8,9 +8,9 @@ contrast = 0.1
 [templates.hyprlock]
 input_path = "~/.config/Ax-Shell/config/matugen/templates/hyprland-colors.conf"
 output_path = "~/.config/Ax-Shell/config/hypr/colors.conf"
-[templates.hyprland]
-input_path = "./templates/hyprlandcolors.lua"
-output_path = "~/.config/hypr/colors.lua"
+#[templates.hyprland]
+#input_path = "./templates/hyprlandcolors.lua"
+#output_path = "~/.config/hypr/colors.lua"
 #[templates.waybar]                                                                                                                                                             
 #input_path = "~/.config/Ax-Shell/config/matugen/templates/waybar.css"                                                                                                            
 #output_path = "~/.config/waybar/style.css"
