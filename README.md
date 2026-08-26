@@ -64,6 +64,7 @@ papirus-icon-theme-git
 pavucontrol
 pipewire-pulse
 power-profiles-daemon 
+power-profiles-daemon-dinit
 proton-cachyos-slr
 protonplus
 protontricks
