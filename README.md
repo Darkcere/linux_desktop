@@ -3,7 +3,7 @@ quickshell
 bibata-cursor-theme
 btop
 cava
-discord -- vencord
+discord
 fish
 dwproton-bin
 dysk
