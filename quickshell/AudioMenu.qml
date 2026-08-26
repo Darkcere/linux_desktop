@@ -106,7 +106,6 @@ Item {
                 value: Pipewire.defaultAudioSink?.audio.volume ?? 0
                 isPlaying: Pipewire.defaultAudioSink?.state === 3
                 
-                // 💡 FIX: Swapped to onMoved to prevent feedback loop spikes
                 onMoved: if (Pipewire.defaultAudioSink) Pipewire.defaultAudioSink.audio.volume = value
                 
                 MouseArea { anchors.fill: parent; acceptedButtons: Qt.NoButton; onWheel: (wheel) => { if (Pipewire.defaultAudioSink) { let s = 0.05; Pipewire.defaultAudioSink.audio.volume = Math.max(0, Math.min(1, Pipewire.defaultAudioSink.audio.volume + (wheel.angleDelta.y > 0 ? s : -s))); } } }
@@ -132,7 +131,6 @@ Item {
                 value: Pipewire.defaultAudioSource?.audio.volume ?? 0
                 isPlaying: Pipewire.defaultAudioSource?.state === 3
                 
-                // 💡 FIX: Swapped to onMoved
                 onMoved: if (Pipewire.defaultAudioSource) Pipewire.defaultAudioSource.audio.volume = value
                 
                 MouseArea { anchors.fill: parent; acceptedButtons: Qt.NoButton; onWheel: (wheel) => { if (Pipewire.defaultAudioSource) { let s = 0.05; Pipewire.defaultAudioSource.audio.volume = Math.max(0, Math.min(1, Pipewire.defaultAudioSource.audio.volume + (wheel.angleDelta.y > 0 ? s : -s))); } } }
@@ -174,12 +172,11 @@ Item {
             
             Column {
                 width: appScrollView.width - (vbar.visible ? vbar.width + 6 : 0)
-                spacing: 12 // Slightly expanded spacing to replace Layout margin offsets
+                spacing: 12
                 
                 Repeater {
                     model: Pipewire.nodes
                     
-                    // 💡 FIX: Swapped out nested heavy layouts for primitive Column/Row types
                     delegate: Column {
                         width: parent.width 
                         spacing: 4
@@ -191,7 +188,6 @@ Item {
                         property bool isPlaybackStream: props && (props["media.class"] === "Stream/Output/Audio")
                         property var pwAudio: valid ? modelData.audio : null
                         
-                        // Keeps unneeded streams perfectly flat and dropped from tree geometry calculations
                         visible: isPlaybackStream
                         height: isPlaybackStream ? implicitHeight : 0
 
@@ -207,15 +203,38 @@ Item {
                             width: parent.width
                             spacing: 10
                             
+                            // App specific mute button
+                            Text { 
+                                width: 15
+                                text: (pwAudio && pwAudio.muted) ? "󰝟" : "󰕾"
+                                color: (pwAudio && pwAudio.muted) ? Colors.workspaceurgent : Colors.text
+                                font.pixelSize: 16
+                                anchors.verticalCenter: parent.verticalCenter // Centered
+                                MouseArea { 
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: if (pwAudio) pwAudio.muted = !pwAudio.muted 
+                                }
+                            }
+                            
                             VolumeSlider {
-                                width: parent.width - 45 // Provides standard layout constraint without Layout.fillWidth
+                                width: parent.width - 75 
+                                anchors.verticalCenter: parent.verticalCenter // 💡 ADDED THIS LINE
                                 value: pwAudio ? pwAudio.volume : 0
                                 isPlaying: valid && modelData.state === 3
                                 
-                                // 💡 FIX: Swapped to onMoved here as well!
                                 onMoved: if (pwAudio) pwAudio.volume = value
                                 
-                                MouseArea { anchors.fill: parent; acceptedButtons: Qt.NoButton; onWheel: (wheel) => { if (pwAudio) { let s = 0.05; pwAudio.volume = Math.max(0, Math.min(1, pwAudio.volume + (wheel.angleDelta.y > 0 ? s : -s))); } } }
+                                MouseArea { 
+                                    anchors.fill: parent
+                                    acceptedButtons: Qt.NoButton
+                                    onWheel: (wheel) => { 
+                                        if (pwAudio) { 
+                                            let s = 0.05; 
+                                            pwAudio.volume = Math.max(0, Math.min(1, pwAudio.volume + (wheel.angleDelta.y > 0 ? s : -s))); 
+                                        } 
+                                    } 
+                                }
                             }
 
                             Text { 
@@ -224,11 +243,10 @@ Item {
                                 color: Colors.text
                                 font.pixelSize: 14
                                 horizontalAlignment: Text.AlignRight
-                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.verticalCenter: parent.verticalCenter // Centered
                             }
                         }
                         
-                        // Extra spacing buffer at base of item
                         Item { width: 1; height: 6 }
                     }
                 }
