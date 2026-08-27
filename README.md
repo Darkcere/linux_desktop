@@ -186,3 +186,4 @@ pipewire-pulse-dinit
 wayvnc
 wireplumber
 wireplumber-dinit
+zramen-dinit
