@@ -12,105 +12,96 @@ Item {
     property bool isOpen: false
     signal closeRequested()
     
-    // 💡 Live metrics properties
+    // Live metrics properties
     property real cpuUsage: 0
     property real ramUsage: 0
     property real diskUsage: 0
     property real gpuUsage: 0
     property var prevCpu: [0, 0]
 
-    // 💡 System Stats Poll Timer
+    // 💡 Optimized Single Poll Timer (Queries CPU, RAM, Disk, and GPU all at once)
     Timer {
-        interval: 2000
+        interval: 2500
         running: root.isOpen
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            cpuProc.running = true;
-            ramProc.running = true;
-            diskProc.running = true;
-            gpuProc.running = true;
+            systemStatsProc.running = true;
         }
     }
 
     Process {
-        id: cpuProc
-        command: ["bash", "-c", "head -n 1 /proc/stat"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let parts = text.trim().split(/\s+/);
-                if (parts.length >= 5) {
-                    let user = parseInt(parts[1]) || 0;
-                    let nice = parseInt(parts[2]) || 0;
-                    let system = parseInt(parts[3]) || 0;
-                    let idle = parseInt(parts[4]) || 0;
-                    
-                    let active = user + nice + system;
-                    let total = active + idle;
-                    
-                    let diffActive = active - root.prevCpu[0];
-                    let diffTotal = total - root.prevCpu[1];
-                    
-                    if (diffTotal > 0) {
-                        root.cpuUsage = Math.min(100, Math.max(0, Math.round((diffActive / diffTotal) * 100)));
-                    }
-                    root.prevCpu = [active, total];
-                }
-            }
-        }
-    }
-
-    Process {
-        id: ramProc
-        command: ["bash", "-c", "awk '/MemTotal:/ {total=$2} /MemAvailable:/ {avail=$2} END {print total, avail}' /proc/meminfo"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let parts = text.trim().split(/\s+/);
-                if (parts.length === 2) {
-                    let total = parseInt(parts[0]);
-                    let avail = parseInt(parts[1]);
-                    if (total > 0) {
-                        let used = total - avail;
-                        root.ramUsage = Math.round((used / total) * 100);
-                    }
-                }
-            }
-        }
-    }
-
-    Process {
-        id: diskProc
-        command: ["bash", "-c", "df / --output=pcent | tail -n 1"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                let val = parseInt(text.replace("%", "").trim());
-                if (!isNaN(val)) {
-                    root.diskUsage = val;
-                }
-            }
-        }
-    }
-
-    // 💡 Dedicated AMD GPU Process for RX 6600 (reads native drm busy percent)
-    Process {
-        id: gpuProc
+        id: systemStatsProc
         command: ["python3", "-c", "
 import glob
-val = 0
-for path in glob.glob('/sys/class/drm/card*/device/gpu_busy_percent'):
-    try:
+
+# 1. CPU usage via /proc/stat
+try:
+    with open('/proc/stat', 'r') as f:
+        fields = [int(x) for x in f.readline().split()[1:]]
+        idle = fields[3] + fields[4]
+        total = sum(fields)
+        print(f'CPU {idle} {total}')
+except Exception:
+    pass
+
+# 2. RAM usage via /proc/meminfo
+try:
+    mem = {}
+    with open('/proc/meminfo', 'r') as f:
+        for line in f:
+            parts = line.split(':')
+            if len(parts) == 2:
+                mem[parts[0].strip()] = int(parts[1].split()[0])
+    total_mem = mem.get('MemTotal', 1)
+    avail_mem = mem.get('MemAvailable', 0)
+    ram_pct = round(((total_mem - avail_mem) / total_mem) * 100)
+    print(f'RAM {ram_pct}')
+except Exception:
+    pass
+
+# 3. Disk usage of root partition
+try:
+    st = __import__('os').statvfs('/')
+    disk_pct = round(((st.f_blocks - st.f_bavail) / st.f_blocks) * 100)
+    print(f'DISK {disk_pct}')
+except Exception:
+    pass
+
+# 4. GPU usage for AMD RX 6600
+try:
+    for path in glob.glob('/sys/class/drm/card*/device/gpu_busy_percent'):
         with open(path, 'r') as f:
-            val = int(f.read().strip())
+            print(f'GPU {f.read().strip()}')
             break
-    except Exception:
-        pass
-print(val)
+except Exception:
+    pass
 "]
         stdout: StdioCollector {
             onStreamFinished: {
-                let val = parseInt(text.trim());
-                if (!isNaN(val)) {
-                    root.gpuUsage = Math.min(100, Math.max(0, val));
+                let lines = text.trim().split('\n');
+                for (let line of lines) {
+                    let parts = line.split(' ');
+                    if (parts.length >= 2) {
+                        let type = parts[0];
+                        if (type === "CPU" && parts.length === 3) {
+                            let idle = parseInt(parts[1]) || 0;
+                            let total = parseInt(parts[2]) || 0;
+                            let diffIdle = idle - root.prevCpu[0];
+                            let diffTotal = total - root.prevCpu[1];
+                            if (diffTotal > 0) {
+                                let usage = 100 - Math.round((diffIdle / diffTotal) * 100);
+                                root.cpuUsage = Math.min(100, Math.max(0, usage));
+                            }
+                            root.prevCpu = [idle, total];
+                        } else if (type === "RAM") {
+                            root.ramUsage = parseInt(parts[1]) || 0;
+                        } else if (type === "DISK") {
+                            root.diskUsage = parseInt(parts[1]) || 0;
+                        } else if (type === "GPU") {
+                            root.gpuUsage = Math.min(100, Math.max(0, parseInt(parts[1]) || 0));
+                        }
+                    }
                 }
             }
         }
@@ -125,45 +116,6 @@ print(val)
         anchors.fill: parent
         anchors.margins: 15
         spacing: 15
-
-        // --- COLUMN 1: SIDE NAV ---
-        Rectangle {
-            Layout.preferredWidth: 50
-            Layout.fillHeight: true
-            color: "transparent"
-            border.color: Colors.workspaceactive
-            border.width: 2
-            radius: 25
-            
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.topMargin: 10
-                anchors.bottomMargin: 10
-                spacing: 15
-                
-                Rectangle {
-                    Layout.alignment: Qt.AlignHCenter
-                    width: 40; height: 40; radius: 20
-                    color: Colors.workspaceactive
-                    Text { anchors.centerIn: parent; text: "󰣇"; color: Colors.background; font.pixelSize: 20 }
-                }
-                
-                Item { Layout.fillHeight: true } 
-                
-                Text { Layout.alignment: Qt.AlignHCenter; text: "󰏘"; color: Colors.text; opacity: 0.6; font.pixelSize: 20 }
-                Text { Layout.alignment: Qt.AlignHCenter; text: "󰓎"; color: Colors.text; opacity: 0.6; font.pixelSize: 20 }
-                Text { Layout.alignment: Qt.AlignHCenter; text: "󰓏"; color: Colors.text; opacity: 0.6; font.pixelSize: 20 }
-                
-                Item { Layout.fillHeight: true } 
-                
-                Rectangle {
-                    Layout.alignment: Qt.AlignHCenter
-                    width: 40; height: 40; radius: 20
-                    color: "transparent"
-                    Text { anchors.centerIn: parent; text: "󰒓"; color: Colors.text; opacity: 0.6; font.pixelSize: 20 }
-                }
-            }
-        }
 
         // --- COLUMN 2: MEDIA PLAYER ---
         Rectangle {
@@ -192,21 +144,25 @@ print(val)
 
             Timer {
                 id: mediaTimer
-                interval: 100 
+                interval: 250 // Throttled to 250ms for low CPU usage while maintaining smooth animation
                 running: root.isOpen && mediaCard.player !== null
                 repeat: true
                 triggeredOnStart: true
                 
                 onTriggered: {
                     if (mediaCard.player && mediaCard.player.length > 0) {
-                        mediaCard.progress = mediaCard.player.position / mediaCard.player.length;
-                        mediaCard.vinylRotation = mediaCard.progress * 360;
+                        let newProg = mediaCard.player.position / mediaCard.player.length;
+                        if (newProg !== mediaCard.progress) {
+                            mediaCard.progress = newProg;
+                            mediaCard.vinylRotation = newProg * 360;
+                            progressCanvas.requestPaint();
+                        }
                     } else {
                         mediaCard.progress = 0;
                         mediaCard.vinylRotation = 0;
+                        progressCanvas.requestPaint();
                     }
-                    progressCanvas.requestPaint();
-                    timeLabel.text = mediaCard.formatTime(mediaCard.player.position) + " / " + mediaCard.formatTime(mediaCard.player?.length);
+                    timeLabel.text = mediaCard.formatTime(mediaCard.player?.position) + " / " + mediaCard.formatTime(mediaCard.player?.length);
                 }
             }
 
@@ -254,7 +210,7 @@ print(val)
                         rotation: mediaCard.vinylRotation
 
                         Behavior on rotation {
-                            NumberAnimation { duration: 100 }
+                            NumberAnimation { duration: 250; easing.type: Easing.Linear }
                         }
 
                         Rectangle { id: artMask; anchors.fill: parent; radius: width/2; visible: false }
@@ -657,7 +613,7 @@ with open('/proc/net/dev', 'r') as f:
                                 if (!h || h.length === 0) return;
                                 
                                 let maxVal = Math.max(...h, 0.5); 
-                                let stepX = width / (h.length - 1);
+                                let stepX = width / Math.max(1, h.length - 1);
                                 
                                 ctx.beginPath();
                                 ctx.moveTo(0, height);
@@ -803,7 +759,6 @@ with open('/proc/net/dev', 'r') as f:
                 border.color: Colors.border
                 border.width: 2
 
-                // 💡 Background fill effect for Speaker Volume
                 Rectangle {
                     anchors.bottom: parent.bottom
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -971,7 +926,7 @@ with open('/proc/net/dev', 'r') as f:
                                     ctx.stroke();
                                 }
                                 Connections {
-                                    target: AudioSource?.audio
+                                    target: AudioService.source?.audio
                                     function onVolumeChanged() { micArcCanvas.requestPaint() }
                                     function onMutedChanged() { micArcCanvas.requestPaint() }
                                 }
@@ -996,12 +951,10 @@ with open('/proc/net/dev', 'r') as f:
 
     Process {
         id: getBrightness
-        // 💡 Uses a resilient Python regex/string parser to extract VCP current value reliably from ddcutil
         command: ["python3", "-c", "
 import subprocess
 try:
     res = subprocess.run(['ddcutil', 'getvcp', '10', '--brief'], capture_output=True, text=True, timeout=1)
-    # expected output format: VCP 10 C 50 100
     parts = res.stdout.strip().split()
     if len(parts) >= 4:
         print(int(parts[3]))
