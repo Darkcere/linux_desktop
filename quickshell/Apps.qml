@@ -7,6 +7,8 @@ Item {
     id: launcherWindow
     
     property bool isOpen: false
+    // 💡 Add the injectedText property to receive the keystroke
+    property string injectedText: ""
     signal closeRequested()
 
     Component.onCompleted: {
@@ -17,15 +19,24 @@ Item {
         id: focusTimer
         interval: 50
         onTriggered: {
-            searchInput.text = ""
+            // 💡 Use the injected text if available, then clear it
+            if (launcherWindow.injectedText !== "") {
+                searchInput.text = launcherWindow.injectedText
+                launcherWindow.injectedText = "" 
+            } else {
+                searchInput.text = ""
+            }
             searchInput.forceActiveFocus()
+            // 💡 Move cursor to the end of the newly injected text
+            searchInput.cursorPosition = searchInput.text.length
         }
     }
 
     // --- REFRESH APPS ON OPEN ---
     onIsOpenChanged: {
         if (isOpen) {
-            filterApps("")
+            // 💡 Filter using the injected text immediately
+            filterApps(launcherWindow.injectedText)
             focusTimer.start()
         }
     }
@@ -395,7 +406,7 @@ Item {
                         text: modelData.name
                         color: (appMouseArea.containsMouse || appsList.currentIndex === index) ? Colors.background : Colors.text
                         font.pixelSize: modelData.isMath ? 18 : 15
-                        font.bold: (appMouseArea.containsMouse || appsList.currentIndex === index) || modelData.isMath
+                        font.bold: true
                         anchors.left: iconContainer.right
                         anchors.leftMargin: 15
                         anchors.right: subtitleText.visible ? subtitleText.left : parent.right

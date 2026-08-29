@@ -6,7 +6,7 @@ Text {
     
     // --- STATE TRACKING ---
     property bool showSeconds: false
-
+    property bool tooltip: true
     // Provides the time data
     SystemClock {
         id: clock
@@ -33,12 +33,16 @@ Text {
         acceptedButtons: Qt.LeftButton 
         onTapped: root.showSeconds = !root.showSeconds
     }
-    
-    // --- THE ANIMATED TOOLTIP ---
-    BarToolTip {
-        targetItem: root
-        active: clockHover.hovered
-        text: "Left Click to toggle seconds"
-        topMargin: 23
+    Loader{
+        active: root.tooltip
+        sourceComponent: Component {
+            // --- THE ANIMATED TOOLTIP ---
+            BarToolTip {
+                targetItem: root
+                active: clockHover.hovered
+                text: "Left Click to toggle seconds"
+                topMargin: 23
+            }
+        }
     }
 }

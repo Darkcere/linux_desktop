@@ -10,6 +10,7 @@ PanelWindow {
     property string lastActiveView: ""
     property bool isBarVisible: false
     property var currentTrayItem: null
+    property string pendingAppSearch: ""
 
     // 💡 THE LOCK: True whenever Polkit is actively prompting
     property bool isPolkitLocked: root.activeView === "polkit"
@@ -18,8 +19,8 @@ PanelWindow {
     property int currentDropWidth: {
         if (lastActiveView === "tray") return trayMenuView.item ? trayMenuView.item.implicitWidth : 600; 
         
-        // Define a fast lookup table
         const widths = {
+            "dashboard": 980,
             "wallpaper": 950,
             "clipboard": 950,
             "powermenu": 400,
@@ -28,15 +29,14 @@ PanelWindow {
             "polkit": 420,
             "tools": 520
         };
-        // Return the mapped value, or default to 600
         return widths[lastActiveView] ?? 600;
     }
 
     property int currentDropHeight: {
         if (lastActiveView === "tray") return trayMenuView.item ? trayMenuView.item.implicitHeight : 450; 
         
-        // Define a fast lookup table
         const heights = {
+            "dashboard": 380,
             "wallpaper": 500,
             "tools": 570,
             "powermenu": 360,
@@ -44,7 +44,6 @@ PanelWindow {
             "notifications": 550,
             "polkit": 280
         };
-        // Return the mapped value, or default to 450
         return heights[lastActiveView] ?? 450;
     }
     property bool isRightAligned: lastActiveView === "tray" || lastActiveView === "audio" || lastActiveView === "notifications"
@@ -59,8 +58,10 @@ PanelWindow {
     onCloseRequested: {
         root.activeView = ""
     }
-
-    // 💡 THE FIX: Protected toggles - return early if Polkit is open!
+    function toggleDashboard() { 
+        if (isPolkitLocked) return; 
+        root.activeView = (root.activeView === "dashboard") ? "" : "dashboard" 
+    }
     function toggleNotifications() { 
         if (isPolkitLocked) return; 
         root.activeView = (root.activeView === "notifications") ? "" : "notifications" 
@@ -110,15 +111,12 @@ PanelWindow {
         root.activeView = (root.activeView === "audio") ? "" : "audio" 
     }
 
-    // 💡 POLKIT STATE HELPERS
-    // Only PolkitDialog can call openPolkit/closePolkit
     function openPolkit() { root.activeView = "polkit" }
     function closePolkit() { if (root.activeView === "polkit") root.closeRequested() }
 
-    anchors { top: true; left: true; right: true }
-    height: isOpen ? root.currentDropHeight : 0
+    // 💡 THE FIX: Anchor to all 4 sides so the PanelWindow covers the full screen height
+    anchors { top: true; bottom: true; left: true; right: true }
     
-    // 💡 THE FIX: Prevent the window from pushing down underlying apps
     exclusiveZone: 0
 
     color: "transparent"
@@ -128,11 +126,31 @@ PanelWindow {
     WlrLayershell.namespace: "dropdowns"
     WlrLayershell.keyboardFocus: isOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+    // --- FULL-SCREEN BACKGROUND CLICK-CATCHER ---
     MouseArea { 
+        id: bgMouseArea
         anchors.fill: parent
         enabled: root.isOpen
+        focus: true
+        
+        Connections {
+            target: root
+            function onActiveViewChanged() {
+                if (root.activeView === "dashboard") {
+                    bgMouseArea.forceActiveFocus()
+                }
+            }
+        }
+        
+        Keys.onPressed: (event) => {
+            if (root.activeView === "dashboard" && event.text.length === 1 && event.text.match(/[a-zA-Z0-9\-\+\=\/\*\^\.\(\)]/)) {
+                root.pendingAppSearch = event.text;
+                root.activeView = "apps";
+                event.accepted = true;
+            }
+        }
+
         onClicked: {
-            // 💡 THE FIX: Prevent accidental outside-click closing while Polkit is open
             if (!root.isPolkitLocked) {
                 root.closeRequested()
             }
@@ -166,6 +184,7 @@ PanelWindow {
             } 
         }
 
+        // Stops clicks inside the dropdown card from propagating to the background closer
         MouseArea { anchors.fill: parent } 
 
         Rectangle {
@@ -195,7 +214,11 @@ PanelWindow {
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
                     sourceComponent: Component {
-                        Apps { isOpen: root.activeView === "apps"; onCloseRequested: root.closeRequested() }
+                        Apps { 
+                            isOpen: root.activeView === "apps"
+                            injectedText: root.pendingAppSearch 
+                            onCloseRequested: root.closeRequested() 
+                        }
                     }
                 }
                 
@@ -282,8 +305,6 @@ PanelWindow {
                     }
                 }
 
-                // 💡 THE FIX: Integrated PolkitDialog Loader
-                // Keeps PolkitAgent active in the background so it catches authentication requests
                 Loader {
                     anchors.fill: parent
                     active: true
@@ -296,6 +317,16 @@ PanelWindow {
                             onOpenRequested: root.openPolkit()
                             onCloseRequested: root.closePolkit()
                         }
+                    }
+                }
+                Loader {
+                    anchors.fill: parent
+                    active: root.activeView === "dashboard" || (root.lastActiveView === "dashboard" && opacityAnim.running)
+                    opacity: root.activeView === "dashboard" ? 1 : 0
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
+                    sourceComponent: Component {
+                        Dashboard { isOpen: root.activeView === "dashboard"; onCloseRequested: root.closeRequested() }
                     }
                 }
             }

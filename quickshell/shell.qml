@@ -101,8 +101,8 @@ ShellRoot {
     
     // Toggle the window with a shortcut
     GlobalShortcut { 
-        name: "toggleSettings"
-        onPressed: settingsLoader.item?.toggle() 
+        name: "toggleDashboard"
+        onPressed: dropdownLoader.item?.toggleDashboard() 
     }
     
         GlobalShortcut { name: "toggleTools"; onPressed: dropdownLoader.item?.toggleTools() }
