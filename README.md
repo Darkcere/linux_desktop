@@ -188,3 +188,4 @@ wireplumber
 wireplumber-dinit
 zramen-dinit
 playerctl
+wtype

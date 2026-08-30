@@ -107,10 +107,6 @@ except Exception:
         }
     }
     
-    Shortcut {
-        sequence: "Escape"
-        onActivated: root.closeRequested()
-    }
     
     RowLayout {
         anchors.fill: parent
@@ -302,21 +298,41 @@ except Exception:
                     }
                     
                     Text { 
-                        text: (mediaCard.player && (mediaCard.player.loopStatus === 1 || mediaCard.player.loopStatus === "Track")) ? "󰑘" : "󰑖"
-                        color: (mediaCard.player && (mediaCard.player.loopStatus === 1 || mediaCard.player.loopStatus === 2 || mediaCard.player.loopStatus === "Track" || mediaCard.player.loopStatus === "Playlist")) ? Colors.workspaceactive : Colors.text
-                        opacity: (mediaCard.player && (mediaCard.player.loopStatus !== 0 && mediaCard.player.loopStatus !== "None")) ? 1.0 : 0.5
+                        // 💡 Normalize the status to a lowercase string so it always matches reliably
+                        property string currentLoop: mediaCard.player ? mediaCard.player.loopState.toString().toLowerCase() : "none"
+                        
+                        // 1 / track = 󰑘 (Loop Track) | 0 / 2 / playlist / none = 󰑖 (Standard Loop)
+                        text: (currentLoop === "1" || currentLoop === "track") ? "󰑘" : "󰑖"
+                        
+                        // Highlight if it's not "none" (0)
+                        color: (currentLoop === "0" || currentLoop === "none") ? Colors.text : Colors.workspaceactive
+                        opacity: (currentLoop === "0" || currentLoop === "none") ? 0.5 : 1.0
+                        
                         font.pixelSize: 18 
                         
                         MouseArea { 
-                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor; 
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor 
+                            
                             onClicked: {
                                 if (!mediaCard.player) return;
-                                let current = mediaCard.player.loopStatus;
-                                let nextState = (current === 0 || current === "None") ? "Playlist" : ((current === 2 || current === "Playlist") ? "Track" : "None");
+                                
+                                let nextState = "none";
+                                
+                                // None -> Playlist -> Track -> None
+                                if (parent.currentLoop === "0" || parent.currentLoop === "none") {
+                                    nextState = "playlist";
+                                } else if (parent.currentLoop === "2" || parent.currentLoop === "playlist") {
+                                    nextState = "track";
+                                } else {
+                                    nextState = "none";
+                                }
+                                
+                                // 💡 playerctl strictly requires lowercase arguments
                                 Quickshell.execDetached({ command: ["playerctl", "loop", nextState] });
                             }
                         }
-                    } 
+                    }
                 }
 
                 Text {

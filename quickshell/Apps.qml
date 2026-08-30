@@ -19,15 +19,13 @@ Item {
         id: focusTimer
         interval: 50
         onTriggered: {
-            // 💡 Use the injected text if available, then clear it
+            // 💡 Only set text if injectedText has a value, but DO NOT modify injectedText here
             if (launcherWindow.injectedText !== "") {
                 searchInput.text = launcherWindow.injectedText
-                launcherWindow.injectedText = "" 
             } else {
                 searchInput.text = ""
             }
             searchInput.forceActiveFocus()
-            // 💡 Move cursor to the end of the newly injected text
             searchInput.cursorPosition = searchInput.text.length
         }
     }
@@ -41,10 +39,6 @@ Item {
         }
     }
 
-    Shortcut {
-        sequence: "Escape"
-        onActivated: launcherWindow.closeRequested()
-    }
 
     Shortcut {
         sequence: "Ctrl+R"

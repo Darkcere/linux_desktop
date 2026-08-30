@@ -14,11 +14,6 @@ Item {
     implicitWidth: menuLayout.implicitWidth 
     implicitHeight: menuLayout.implicitHeight + 12
 
-    Shortcut {
-        sequence: "Escape"
-        onActivated: menuRoot.closeRequested()
-    }
-
     QsMenuOpener {
         id: menuOpener
         menu: menuRoot.activeItem ? menuRoot.activeItem.menu : null

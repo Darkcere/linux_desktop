@@ -108,7 +108,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay 
     WlrLayershell.namespace: "dropdowns"
     WlrLayershell.keyboardFocus: isOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-
+    
     // --- CLICK AND KEY CATCHER ---
     MouseArea { 
         id: bgMouseArea
@@ -120,21 +120,27 @@ PanelWindow {
             target: root
             function onActiveViewChanged() {
                 if (root.activeView === "dashboard") {
-                    bgMouseArea.forceActiveFocus()
+                    Qt.callLater(function() {
+                        // Explicitly clear focus from whatever view had it last, 
+                        // then force it back to the background catcher.
+                        bgMouseArea.parent.forceActiveFocus();
+                        bgMouseArea.forceActiveFocus();
+                    })
                 }
             }
         }
         
         // Ensure Escape closes the window
-        Keys.onEscapePressed: {
+        Keys.onEscapePressed: event => {
             if (!root.isPolkitLocked) {
                 root.closeRequested()
             }
         }
 
         // Dashboard typing detection to switch to Apps launcher
-        Keys.onPressed: (event) => {
-            if (root.activeView === "dashboard" && event.text.length === 1 && searchRegex.test(event.text)) {
+        Keys.onPressed: event => {
+            if (root.activeView === "dashboard") {
+                root.pendingAppSearch = ""; 
                 root.pendingAppSearch = event.text;
                 root.activeView = "apps";
                 event.accepted = true;

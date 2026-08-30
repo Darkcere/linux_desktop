@@ -8,11 +8,6 @@ Item {
     id: root
     property bool isOpen: false
     signal closeRequested()
-    
-    Shortcut {
-        sequence: "Escape"
-        onActivated: root.closeRequested()
-    }
 
     // --- CUSTOM STYLED SLIDER WITH BREATHING ANIMATION & HOVER EFFECTS ---
     component VolumeSlider: Slider {
