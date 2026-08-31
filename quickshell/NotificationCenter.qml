@@ -9,7 +9,10 @@ Item {
     signal closeRequested()
     
     property bool hasNotifications: NotificationManager.list.length > 0
-
+    Shortcut {
+        sequence: "Escape"
+        onActivated: root.closeRequested()
+    }
     Loader {
         anchors.fill: parent
         active: root.isOpen 

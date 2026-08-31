@@ -15,9 +15,6 @@ PanelWindow {
     // 💡 THE LOCK: True whenever Polkit is actively prompting
     property bool isPolkitLocked: root.activeView === "polkit"
 
-    // ⚡ PRE-COMPILED REGEX (Performance boost for typing detection)
-    property var searchRegex: /^[a-zA-Z0-9\-\+\=\/\*\^\.\(\)]$/
-
     // ⚡ O(1) DYNAMIC MORPHING DIMENSIONS (Massive performance boost over dictionary objects)
     function getDropWidth(view) {
         if (view === "tray") return trayMenuView.item ? trayMenuView.item.implicitWidth : 600; 
@@ -37,7 +34,7 @@ PanelWindow {
     function getDropHeight(view) {
         if (view === "tray") return trayMenuView.item ? trayMenuView.item.implicitHeight : 450; 
         switch(view) {
-            case "dashboard": return 380;
+            case "dashboard": return 400;
             case "wallpaper": return 500;
             case "tools": return 570;
             case "powermenu": return 360;
@@ -140,10 +137,13 @@ PanelWindow {
         // Dashboard typing detection to switch to Apps launcher
         Keys.onPressed: event => {
             if (root.activeView === "dashboard") {
-                root.pendingAppSearch = ""; 
-                root.pendingAppSearch = event.text;
-                root.activeView = "apps";
-                event.accepted = true;
+                // Matches any single printable character, including letters, numbers, and symbols (excluding whitespace)
+                if (/^\S$/.test(event.text)) {
+                    root.pendingAppSearch = ""; 
+                    root.pendingAppSearch = event.text;
+                    root.activeView = "apps";
+                    event.accepted = true;
+                }
             }
         }
 
@@ -206,9 +206,8 @@ PanelWindow {
 
                 // ⚡ LAZY-LOAD & KEEP-ALIVE SYSTEM: Eliminates lag when reopening views
                 Loader {
-                    property bool keepAlive: false
-                    active: keepAlive || root.activeView === "apps"
-                    onActiveChanged: if (active) keepAlive = true
+                    active: root.activeView === "apps"
+
                     
                     anchors.fill: parent
                     opacity: root.activeView === "apps" ? 1 : 0
@@ -225,9 +224,8 @@ PanelWindow {
                 
                 Loader {
                     id: trayMenuView
-                    property bool keepAlive: false
-                    active: keepAlive || root.activeView === "tray"
-                    onActiveChanged: if (active) keepAlive = true
+                    active: root.activeView === "tray"
+
                     
                     anchors.fill: parent
                     opacity: root.activeView === "tray" ? 1 : 0
@@ -244,9 +242,8 @@ PanelWindow {
                 
                 Loader {
                     id: wallpaperPickerLoader
-                    property bool keepAlive: false
-                    active: keepAlive || root.activeView === "wallpaper"
-                    onActiveChanged: if (active) keepAlive = true
+                    active: root.activeView === "wallpaper"
+
                     
                     anchors.fill: parent
                     opacity: root.activeView === "wallpaper" ? 1 : 0
@@ -258,10 +255,8 @@ PanelWindow {
                 }
                 
                 Loader {
-                    property bool keepAlive: false
-                    active: keepAlive || root.activeView === "powermenu"
-                    onActiveChanged: if (active) keepAlive = true
-                    
+                    active: root.activeView === "powermenu"
+
                     anchors.fill: parent
                     opacity: root.activeView === "powermenu" ? 1 : 0
                     visible: opacity > 0
@@ -272,9 +267,8 @@ PanelWindow {
                 }
                 
                 Loader {
-                    property bool keepAlive: false
-                    active: keepAlive || root.activeView === "clipboard"
-                    onActiveChanged: if (active) keepAlive = true
+
+                    active: root.activeView === "clipboard"
                     
                     anchors.fill: parent
                     opacity: root.activeView === "clipboard" ? 1 : 0
@@ -286,9 +280,7 @@ PanelWindow {
                 }
                 
                 Loader {
-                    property bool keepAlive: false
-                    active: keepAlive || root.activeView === "tools"
-                    onActiveChanged: if (active) keepAlive = true
+                    active: root.activeView === "tools"
                     
                     anchors.fill: parent
                     opacity: root.activeView === "tools" ? 1 : 0
@@ -300,9 +292,7 @@ PanelWindow {
                 }
 
                 Loader {
-                    property bool keepAlive: false
-                    active: keepAlive || root.activeView === "audio"
-                    onActiveChanged: if (active) keepAlive = true
+                    active: root.activeView === "audio"
                     
                     anchors.fill: parent
                     opacity: root.activeView === "audio" ? 1 : 0
@@ -314,9 +304,8 @@ PanelWindow {
                 }
                 
                 Loader {
-                    property bool keepAlive: false
-                    active: keepAlive || root.activeView === "notifications"
-                    onActiveChanged: if (active) keepAlive = true
+
+                    active: root.activeView === "notifications"
                     
                     anchors.fill: parent
                     opacity: root.activeView === "notifications" ? 1 : 0
@@ -343,9 +332,8 @@ PanelWindow {
                 }
                 
                 Loader {
-                    property bool keepAlive: false
-                    active: keepAlive || root.activeView === "dashboard"
-                    onActiveChanged: if (active) keepAlive = true
+
+                    active: root.activeView === "dashboard"
                     
                     anchors.fill: parent
                     opacity: root.activeView === "dashboard" ? 1 : 0

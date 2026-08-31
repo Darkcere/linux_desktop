@@ -121,7 +121,7 @@ EOF
         if (index < 0 || index >= activeModel.length) return;
         
         let action = activeModel[index].action;
-        let scriptsDir = "/home/duarte/.config/Ax-Shell/scripts/";
+        let scriptsDir = Quickshell.env("HOME") + "/.config/Ax-Shell/scripts/";
         
         if (action.startsWith("menu_")) {
             toolsWindow.currentMenuId = action;

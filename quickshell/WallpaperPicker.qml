@@ -115,7 +115,7 @@ Item {
         let bashCmd = `
             echo "${targetPath}" > "$HOME/.current_wall_path"
             ln -sf "${targetPath}" "$HOME/.current.wall"
-            hyprctl dispatch global quickshell:updateWallpaper
+            qs ipc call wallpaper update
         `;
         
         Quickshell.execDetached({ command: ["bash", "-c", bashCmd] });

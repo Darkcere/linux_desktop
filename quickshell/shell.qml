@@ -2,10 +2,14 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import QtQuick
+import Quickshell.Io
 
 ShellRoot {
     id: root
-    
+    Connections {
+        target: Quickshell
+        function onReloadCompleted() { Quickshell.inhibitReloadPopup() }
+    }
     Connections {
         target: Hyprland
         function onRawEvent(event) {
@@ -114,18 +118,20 @@ ShellRoot {
     GlobalShortcut { name: "toggleNotifications"; onPressed: dropdownLoader.item?.toggleNotifications() }
     
     GlobalShortcut { name: "toggleBar"; onPressed: root.isBarActive = !root.isBarActive }
-    GlobalShortcut {
-        name: "updateWallpaper"
-        onPressed: {
+    IpcHandler {
+        target: "wallpaper"
+
+        function update(): void {
             root.applySystemColors();
             root.wallpaperToken = Date.now().toString();
         }
     }
-    
-    Connections {
-        target: Quickshell
-        function onReloadCompleted() { Quickshell.inhibitReloadPopup() }
+    LockScreen {
+        id: myLockScreen
+        isLocked: false 
     }
+    GlobalShortcut { name: "lockScreen"; onPressed: myLockScreen.isLocked = true }
+    
 
     Loader {
         active: root.isBarActive && !root.realFullscreen
@@ -140,14 +146,6 @@ ShellRoot {
         }
     }
     
-    // Add a GlobalShortcut or custom function to trigger the lock manually
-    GlobalShortcut { 
-        name: "lockSession"
-        onPressed: {
-            console.log("Lock shortcut intercepted!");
-            systemLock.lockSession();
-        }
-    }
     LazyLoader {
         id: popupsLoader
         loading: true

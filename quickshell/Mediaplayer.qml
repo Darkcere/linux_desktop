@@ -10,7 +10,7 @@ Rectangle {
     implicitHeight: 24
     color: "transparent"
     enabled: root.Window.visibility !== Window.Hidden
-
+    property bool isDashboardopen: false
     // 💡 THE FIX: Track the last used player asynchronously to avoid QML Binding Loop errors!
     property string lastPlayerName: ""
     onPlayerChanged: {
@@ -61,7 +61,7 @@ Rectangle {
             
             width: 22
             height: 22
-            visible: root.player !== null
+            visible: root.player !== null && !root.isDashboardopen
             
             HoverHandler {
                 id: artcontainerHover
@@ -177,7 +177,7 @@ Rectangle {
             // 💡 THE FIX: Explicitly center vertically
             anchors.verticalCenter: parent.verticalCenter
             
-            visible: root.title
+            visible: root.title && !root.isDashboardopen
             HoverHandler { id: mediaHover }
             
             width: Math.min(implicitWidth, 200)

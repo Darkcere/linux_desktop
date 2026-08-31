@@ -169,7 +169,7 @@ PanelWindow {
                             Behavior on opacity { NumberAnimation { duration: 150 } }
                             
                             Clock { z: -1; anchors.verticalCenter: parent.verticalCenter }
-                            Mediaplayer { z: 10; anchors.verticalCenter: parent.verticalCenter }
+                            Mediaplayer { z: 10; anchors.verticalCenter: parent.verticalCenter; isDashboardopen: isDropdownOpen && menuHandler.lastActiveView === "dashboard" }
                         }
                     }
                 }

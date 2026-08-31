@@ -2,16 +2,20 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import Qt5Compat.GraphicalEffects
-import Quickshell.Networking
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
-
+import Quickshell.Bluetooth
+import QtCore
 Item {
     id: root
     property bool isOpen: false
+    property bool showBluetoothMenu: false
     signal closeRequested()
-    
+    Shortcut {
+        sequence: "Escape"
+        onActivated: root.closeRequested()
+    }
     // Live metrics properties
     property real cpuUsage: 0
     property real ramUsage: 0
@@ -124,7 +128,63 @@ except Exception:
             radius: 20
             clip: true
 
-            property var player: Mpris.players.values.length > 0 ? Mpris.players.values[0] : null
+            // 1. QML Native Cache (Saves seamlessly in the background)
+            Settings {
+                id: mediaCache
+                category: "DashboardMedia"
+                property string lastPlayer: ""
+            }
+
+            // Bind our variable directly to the cache
+            property string selectedPlayerName: mediaCache.lastPlayer
+
+            // Update the cache instantly whenever we cycle to a new player
+            onSelectedPlayerNameChanged: {
+                mediaCache.lastPlayer = selectedPlayerName;
+            }
+
+            property var validPlayers: {
+                const rawList = Mpris.players.values;
+                if (!rawList) return [];
+                return rawList.filter(p => !p.dbusName.includes("playerctld"));
+            }
+
+            // 2. The brain that cleanly prioritizes what to show
+            property var player: {
+                if (validPlayers.length === 0) return null;
+
+                // Priority A: If ANY player is actively playing right now, snap to it and update the cache!
+                let playing = validPlayers.find(p => p.isPlaying);
+                if (playing) {
+                    if (selectedPlayerName !== playing.dbusName) {
+                        selectedPlayerName = playing.dbusName; 
+                    }
+                    return playing;
+                }
+
+                // Priority B: Everyone is stopped. Load the cached player we saved before closing
+                if (selectedPlayerName !== "") {
+                    let match = validPlayers.find(p => p.dbusName === selectedPlayerName);
+                    if (match) return match;
+                }
+                
+                // Priority C: Absolute fallback if the cache is empty or the cached app was closed
+                return validPlayers[0];
+            }
+
+            function cyclePlayer(direction) {
+                if (validPlayers.length <= 1) return;
+                
+                let currentIndex = 0;
+                if (player) {
+                    currentIndex = validPlayers.findIndex(p => p.dbusName === player.dbusName);
+                }
+                if (currentIndex === -1) currentIndex = 0;
+                
+                let nextIndex = (currentIndex + direction + validPlayers.length) % validPlayers.length;
+                selectedPlayerName = validPlayers[nextIndex].dbusName; // This automatically triggers the cache save
+            }
+
             property real progress: 0
             property real vinylRotation: 0
 
@@ -132,11 +192,11 @@ except Exception:
                 if (seconds === undefined || seconds === null || isNaN(seconds)) return "0:00";
                 let totalSec = Math.floor(Number(seconds));
                 if (totalSec <= 0) return "0:00";
-                
                 let m = Math.floor(totalSec / 60);
                 let s = totalSec % 60;
                 return m + ":" + (s < 10 ? "0" : "") + s;
             }
+
 
             Timer {
                 id: mediaTimer
@@ -161,76 +221,118 @@ except Exception:
                     timeLabel.text = mediaCard.formatTime(mediaCard.player?.position) + " / " + mediaCard.formatTime(mediaCard.player?.length);
                 }
             }
-
+            
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 20
                 spacing: 10
 
-                Item {
+                RowLayout {
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 140
-                    Layout.preferredHeight: 140
-                    
-                    Canvas {
-                        id: progressCanvas
-                        anchors.fill: parent
-                        property color trackColor: Colors.border
-                        property color progressColor: Colors.workspaceactive
-                        
-                        onPaint: {
-                            var ctx = getContext("2d");
-                            ctx.clearRect(0, 0, width, height);
-                            
-                            ctx.beginPath();
-                            ctx.arc(width/2, height/2, width/2 - 4, Math.PI * 0.75, Math.PI * 0.25);
-                            ctx.strokeStyle = trackColor;
-                            ctx.lineWidth = 6;
-                            ctx.lineCap = "round";
-                            ctx.stroke();
-                            
-                            ctx.beginPath();
-                            ctx.arc(width/2, height/2, width/2 - 4, Math.PI * 0.75, Math.PI * 0.75 + (mediaCard.progress * Math.PI * 1.5));
-                            ctx.strokeStyle = progressColor;
-                            ctx.lineWidth = 6;
-                            ctx.lineCap = "round";
-                            ctx.stroke();
+                    spacing: 8
+
+                    // --- LEFT ARROW ---
+                    Text {
+                        text: ""
+                        color: Colors.text
+                        visible: mediaCard.validPlayers.length > 1 ? true : false
+                        font.pixelSize: 14
+                        Layout.alignment: Qt.AlignVCenter
+
+                        MouseArea {
+                            id: leftArrowMouse
+                            anchors.fill: parent
+                            anchors.margins: -10 // Expands click target area
+                            enabled: mediaCard.validPlayers.length > 1
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: mediaCard.cyclePlayer(-1)
                         }
                     }
 
+                    // --- ALBUM ART CONTAINER ---
                     Item {
-                        id: artContainer
-                        anchors.centerIn: parent
-                        width: 110; height: 110
+                        Layout.preferredWidth: 140
+                        Layout.preferredHeight: 140
                         
-                        rotation: mediaCard.vinylRotation
-
-                        Behavior on rotation {
-                            NumberAnimation { duration: 250; easing.type: Easing.Linear }
+                        Canvas {
+                            id: progressCanvas
+                            anchors.fill: parent
+                            property color trackColor: Colors.border
+                            property color progressColor: Colors.workspaceactive
+                            
+                            onPaint: {
+                                var ctx = getContext("2d");
+                                ctx.clearRect(0, 0, width, height);
+                                
+                                ctx.beginPath();
+                                ctx.arc(width/2, height/2, width/2 - 4, Math.PI * 0.75, Math.PI * 0.25);
+                                ctx.strokeStyle = trackColor;
+                                ctx.lineWidth = 6;
+                                ctx.lineCap = "round";
+                                ctx.stroke();
+                                
+                                ctx.beginPath();
+                                ctx.arc(width/2, height/2, width/2 - 4, Math.PI * 0.75, Math.PI * 0.75 + (mediaCard.progress * Math.PI * 1.5));
+                                ctx.strokeStyle = progressColor;
+                                ctx.lineWidth = 6;
+                                ctx.lineCap = "round";
+                                ctx.stroke();
+                            }
                         }
 
-                        Rectangle { id: artMask; anchors.fill: parent; radius: width/2; visible: false }
-                        
-                        Image {
-                            anchors.fill: parent
-                            source: mediaCard.player ? mediaCard.player.trackArtUrl : ""
-                            fillMode: Image.PreserveAspectCrop
-                            layer.enabled: true
-                            layer.effect: OpacityMask { maskSource: artMask }
+                        Item {
+                            id: artContainer
+                            anchors.centerIn: parent
+                            width: 110; height: 110
                             
-                            Rectangle {
+                            rotation: mediaCard.vinylRotation
+
+                            Behavior on rotation {
+                                NumberAnimation { duration: 250; easing.type: Easing.Linear }
+                            }
+
+                            Rectangle { id: artMask; anchors.fill: parent; radius: width/2; visible: false }
+                            
+                            Image {
                                 anchors.fill: parent
-                                color: Colors.workspaceactive
-                                visible: parent.status === Image.Error || parent.source == ""
-                                Text { anchors.centerIn: parent; text: "󰝚"; color: Colors.background; font.pixelSize: 40 }
+                                source: mediaCard.player ? mediaCard.player.trackArtUrl : ""
+                                fillMode: Image.PreserveAspectCrop
+                                layer.enabled: true
+                                layer.effect: OpacityMask { maskSource: artMask }
+                                
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: Colors.workspaceactive
+                                    visible: parent.status === Image.Error || parent.source == ""
+                                    Text { anchors.centerIn: parent; text: "󰝚"; color: Colors.background; font.pixelSize: 40 }
+                                }
+                                
+                                Rectangle {
+                                    anchors.centerIn: parent
+                                    visible: mediaCard.player && parent.status !== Image.Error && parent.source != ""
+                                    width: 14; height: 14; radius: 7
+                                    color: Colors.background
+                                    opacity: 0.8
+                                }
                             }
-                            
-                            Rectangle {
-                                anchors.centerIn: parent
-                                visible: mediaCard.player ? true : false
-                                width: 14; height: 14; radius: 7
-                                color: Colors.background
-                            }
+                        }
+                    }
+
+                    // --- RIGHT ARROW ---
+                    Text {
+                        text: ""
+                        color: Colors.text
+                        visible: mediaCard.validPlayers.length > 1 ? true : false
+                        font.pixelSize: 14
+                        Layout.alignment: Qt.AlignVCenter
+
+                        MouseArea {
+                            id: rightArrowMouse
+                            anchors.fill: parent
+                            anchors.margins: -10
+                            enabled: mediaCard.validPlayers.length > 1
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: mediaCard.cyclePlayer(1)
                         }
                     }
                 }
@@ -248,14 +350,19 @@ except Exception:
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: mediaCard.player ? mediaCard.player.trackArtist : " "
+                    text: {
+                        let artist = mediaCard.player ? mediaCard.player.trackArtist : ""
+                        let album = mediaCard.player ? mediaCard.player.trackAlbum : ""
+                        
+                        if (artist && album) return artist + " • " + album
+                        return artist || album || " "
+                    }
                     color: Colors.text
                     opacity: 0.7
                     font.pixelSize: 13
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
                 }
-
                 Item { Layout.fillHeight: true }
 
                 RowLayout {
@@ -347,7 +454,7 @@ except Exception:
             }
         }
 
-        // --- COLUMN 3: TOGGLES & CALENDAR ---
+       // --- COLUMN 3: TOGGLES & CALENDAR ---
         ColumnLayout {
             Layout.preferredWidth: 260
             Layout.fillHeight: true
@@ -357,24 +464,72 @@ except Exception:
                 id: quickSettings
                 Layout.fillWidth: true
                 Layout.preferredHeight: 46 
+                Layout.maximumHeight: 46 // 💡 This forces the buttons to never stretch vertically
                 spacing: 10
                 
-                property bool btOn: true
+                property bool btOn: Bluetooth.defaultAdapter.enabled
                 property bool caffeineOn: false
                 property bool gameOn: false
 
+                // 💡 Modified Bluetooth Toggle with Split Button & Arrow
                 Rectangle { 
                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 12
                     color: quickSettings.btOn ? Colors.workspaceactive : "transparent"
                     border.color: quickSettings.btOn ? "transparent" : Colors.border; border.width: quickSettings.btOn ? 0 : 2
+                    clip: true // Prevents inner items from drawing outside the rounded corners
                     
-                    Text { anchors.centerIn: parent; text: quickSettings.btOn ? "󰂯" : "󰂲"; color: quickSettings.btOn ? Colors.background : Colors.text; opacity: quickSettings.btOn ? 1.0 : 0.7; font.pixelSize: 20 }
-                    
-                    MouseArea {
-                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            quickSettings.btOn = !quickSettings.btOn;
-                            Quickshell.execDetached({ command: ["rfkill", quickSettings.btOn ? "unblock" : "block", "bluetooth"] });
+                    RowLayout {
+                        anchors.fill: parent
+                        spacing: 0
+                        
+                        // Main Toggle Area
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            
+                            Text { 
+                                anchors.centerIn: parent
+                                text: quickSettings.btOn ? "󰂯" : "󰂲"
+                                color: quickSettings.btOn ? Colors.background : Colors.text
+                                opacity: quickSettings.btOn ? 1.0 : 0.7
+                                font.pixelSize: 20 
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    quickSettings.btOn = !quickSettings.btOn;
+                                    Quickshell.execDetached({ command: ["rfkill", quickSettings.btOn ? "unblock" : "block", "bluetooth"] });
+                                }
+                            }
+                        }
+                        
+                        // Mini Separator Line
+                        Rectangle {
+                            width: 1
+                            Layout.fillHeight: true
+                            Layout.topMargin: 8
+                            Layout.bottomMargin: 8
+                            color: quickSettings.btOn ? Colors.background : Colors.border
+                            opacity: 0.4
+                        }
+                        
+                        // Menu Dropdown Arrow
+                        Item {
+                            Layout.preferredWidth: 25
+                            Layout.fillHeight: true
+                            
+                            Text { 
+                                anchors.centerIn: parent
+                                text: root.showBluetoothMenu ? "" : "" // Nerd font chevron up/down
+                                color: quickSettings.btOn ? Colors.background : Colors.text
+                                opacity: 0.9; font.pixelSize: 14 
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                onClicked: root.showBluetoothMenu = !root.showBluetoothMenu
+                            }
                         }
                     }
                 }
@@ -411,41 +566,33 @@ except Exception:
                         }
                     }
                 }
+            }
 
-                Process {
-                    id: checkStatesProcess
-                    command: ["bash", "-c", `
-                        bt=$(rfkill list bluetooth | grep -qi 'Soft blocked: yes' && echo 'off' || echo 'on')
-                        gm=$(bash ~/.config/Ax-Shell/scripts/gamemode.sh check 2>/dev/null)
-                        [[ "$gm" == "t" ]] && game="on" || game="off"
-                        
-                        if pgrep -x "hypridle" >/dev/null || pgrep -x "swayidle" >/dev/null; then
-                            caff="off"
-                        else
-                            caff="on"
-                        fi
-                        echo "$bt|$caff|$game"
-                    `]
-                    running: root.isOpen 
-                    stdout: StdioCollector {
-                        onStreamFinished: {
-                            let parts = text.trim().split("|");
-                            if (parts.length === 3) {
-                                quickSettings.btOn = (parts[0] === "on");
-                                quickSettings.caffeineOn = (parts[1] === "on");
-                                quickSettings.gameOn = (parts[2] === "on");
-                            }
-                        }
-                    }
+            Loader {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                active: !root.showBluetoothMenu // Unloads from memory when BT menu is open
+                visible: status === Loader.Ready
+                
+                sourceComponent: Component {
+                    DashboardCalendar {}
                 }
             }
 
-            DashboardCalendar {
+            Loader {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                active: root.showBluetoothMenu // Only exists in memory when requested
+                visible: status === Loader.Ready
+                
+                sourceComponent: Component {
+                    BluetoothMenu {
+                        onCloseRequested: root.showBluetoothMenu = false
+                    }
+                }
             }
         }
-
+ 
         // --- COLUMN 4: SYSTEM STATS & NETWORK ---
         ColumnLayout {
             Layout.preferredWidth: 260

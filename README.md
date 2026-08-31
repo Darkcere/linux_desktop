@@ -13,7 +13,6 @@ hyprland
 fastfetch
 gnome-disk-utility
 goverlay
-hyprlock
 hypridle
 hyprshot
 heroic-games-launcher-bin

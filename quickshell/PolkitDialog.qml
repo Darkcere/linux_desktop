@@ -80,15 +80,6 @@ Item {
         }
     }
 
-    // Global Escape shortcut to cancel authentication
-    Shortcut {
-        sequence: "Escape"
-        enabled: root.isOpen
-        onActivated: {
-            root.cancelAuth()
-        }
-    }
-
     // 💡 THE FIX: Uses cancelAuthenticationRequest() to properly terminate the D-Bus/PAM session
     function cancelAuth() {
         if (root.isCancelling) return
@@ -158,11 +149,6 @@ Item {
                 echoMode: TextInput.Password
                 clip: true
                 enabled: !root.isAuthenticating && !root.isCancelling && polkitAgent.isActive
-
-                Keys.onEscapePressed: (event) => {
-                    event.accepted = true
-                    root.cancelAuth()
-                }
 
                 onAccepted: {
                     if (text.length > 0 && !root.isAuthenticating && polkitAgent.flow) {
