@@ -18,6 +18,26 @@ ShellRoot {
             }
         }
     }
+    property bool isScreenLocked: false
+
+    // 💡 THE FIX: Moved the lock listener to the main shell and throttled it to 250ms
+    // to massively reduce idle CPU usage while remaining responsive.
+    Timer {
+        interval: 250
+        running: !root.isScreenLocked
+        repeat: true
+        onTriggered: lockCheckProc.running = true
+    }
+
+    Process {
+        id: lockCheckProc
+        command: ["sh", "-c", "[ -f /tmp/qs_locked ] && rm /tmp/qs_locked && echo LOCK"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.trim() === "LOCK") root.isScreenLocked = true;
+            }
+        }
+    }
     property bool realFullscreen: {
         let workspaceHasFs = Hyprland.focusedWorkspace?.hasFullscreen ?? false;
         if (!workspaceHasFs) return false;
@@ -126,9 +146,16 @@ ShellRoot {
             root.wallpaperToken = Date.now().toString();
         }
     }
-    LockScreen {
-        id: myLockScreen
-        isLocked: false 
+    Loader {
+        id: lockScreenLoader
+        active: root.isScreenLocked
+        sourceComponent: Component {
+            LockScreen {
+                // Pass the locked state and listen for the cleanup signal
+                isLocked: root.isScreenLocked
+                onUnlocked: root.isScreenLocked = false
+            }
+        }
     }
     GlobalShortcut { name: "lockScreen"; onPressed: myLockScreen.isLocked = true }
     

@@ -17,26 +17,8 @@ Scope {
     property string currentPassword: ""
     property int shakeTrigger: 0
 
-    // ==========================================
-    // 💡 THE SYSTEMD / LOGINCTL LISTENER
-    // Stays at 20ms so it detects the lock command instantly
-    // ==========================================
-    Timer {
-        interval: 20
-        running: !root.isLocked
-        repeat: true
-        onTriggered: lockCheckProc.running = true
-    }
-
-    Process {
-        id: lockCheckProc
-        command: ["sh", "-c", "[ -f /tmp/qs_locked ] && rm /tmp/qs_locked && echo LOCK"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (text.trim() === "LOCK") root.isLocked = true;
-            }
-        }
-    }
+    // 💡 NEW: Signal to tell shell.qml to destroy this component from memory
+    signal unlocked()
 
     // ==========================================
     // 💡 NATIVE PAM AUTHENTICATION
@@ -44,7 +26,7 @@ Scope {
     PamContext {
         id: pam
         config: "su"
-
+        
         onPamMessage: {
             if (this.responseRequired) {
                 this.respond(root.currentPassword);
@@ -64,7 +46,6 @@ Scope {
         }
     }
 
-    // 💡 Timer extended to 1200ms so the new slow animation has time to finish
     Timer {
         id: unlockTimer
         interval: 1200 
@@ -73,6 +54,9 @@ Scope {
             root.isUnlocking = false;
             root.unlockInProgress = false;
             Quickshell.execDetached({ command: ["rm", "-f", "/tmp/qs_is_locked", "/tmp/qs_locked"] });
+            
+            // 💡 NEW: Tell the Loader in shell.qml to deactivate and garbage collect
+            root.unlocked();
         }
     }
 

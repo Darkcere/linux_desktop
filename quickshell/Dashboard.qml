@@ -6,16 +6,21 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 import Quickshell.Bluetooth
+import Quickshell.Networking
 import QtCore
+
 Item {
     id: root
     property bool isOpen: false
     property bool showBluetoothMenu: false
+    property bool showNetworkMenu: false
     signal closeRequested()
+
     Shortcut {
         sequence: "Escape"
         onActivated: root.closeRequested()
     }
+
     // Live metrics properties
     property real cpuUsage: 0
     property real ramUsage: 0
@@ -35,52 +40,75 @@ Item {
     }
 
     Process {
+        id: getCaffeineState
+        // Checks if either hypridle or swayidle is currently running
+        command: ["bash", "-c", "pgrep -x hypridle || pgrep -x swayidle"]
+        running: root.isOpen 
+        stdout: StdioCollector {
+            onStreamFinished: {
+                quickSettings.caffeineOn = (text.trim() === "");
+            }
+        }
+    }
+
+    Process {
+        id: getGameState
+        command: ["bash", "-c", "bash ~/.config/Ax-Shell/scripts/gamemode.sh check"]
+        running: root.isOpen 
+        stdout: StdioCollector {
+            onStreamFinished: {
+                quickSettings.gameOn = (text.trim() === "t");
+            }
+        }
+    }
+
+    Process {
         id: systemStatsProc
         command: ["python3", "-c", "
-import glob
+            import glob
 
-# 1. CPU usage via /proc/stat
-try:
-    with open('/proc/stat', 'r') as f:
-        fields = [int(x) for x in f.readline().split()[1:]]
-        idle = fields[3] + fields[4]
-        total = sum(fields)
-        print(f'CPU {idle} {total}')
-except Exception:
-    pass
+            # 1. CPU usage via /proc/stat
+            try:
+                with open('/proc/stat', 'r') as f:
+                    fields = [int(x) for x in f.readline().split()[1:]]
+                    idle = fields[3] + fields[4]
+                    total = sum(fields)
+                    print(f'CPU {idle} {total}')
+            except Exception:
+                pass
 
-# 2. RAM usage via /proc/meminfo
-try:
-    mem = {}
-    with open('/proc/meminfo', 'r') as f:
-        for line in f:
-            parts = line.split(':')
-            if len(parts) == 2:
-                mem[parts[0].strip()] = int(parts[1].split()[0])
-    total_mem = mem.get('MemTotal', 1)
-    avail_mem = mem.get('MemAvailable', 0)
-    ram_pct = round(((total_mem - avail_mem) / total_mem) * 100)
-    print(f'RAM {ram_pct}')
-except Exception:
-    pass
+            # 2. RAM usage via /proc/meminfo
+            try:
+                mem = {}
+                with open('/proc/meminfo', 'r') as f:
+                    for line in f:
+                        parts = line.split(':')
+                        if len(parts) == 2:
+                            mem[parts[0].strip()] = int(parts[1].split()[0])
+                total_mem = mem.get('MemTotal', 1)
+                avail_mem = mem.get('MemAvailable', 0)
+                ram_pct = round(((total_mem - avail_mem) / total_mem) * 100)
+                print(f'RAM {ram_pct}')
+            except Exception:
+                pass
 
-# 3. Disk usage of root partition
-try:
-    st = __import__('os').statvfs('/')
-    disk_pct = round(((st.f_blocks - st.f_bavail) / st.f_blocks) * 100)
-    print(f'DISK {disk_pct}')
-except Exception:
-    pass
+            # 3. Disk usage of root partition
+            try:
+                st = __import__('os').statvfs('/')
+                disk_pct = round(((st.f_blocks - st.f_bavail) / st.f_blocks) * 100)
+                print(f'DISK {disk_pct}')
+            except Exception:
+                pass
 
-# 4. GPU usage for AMD RX 6600
-try:
-    for path in glob.glob('/sys/class/drm/card*/device/gpu_busy_percent'):
-        with open(path, 'r') as f:
-            print(f'GPU {f.read().strip()}')
-            break
-except Exception:
-    pass
-"]
+            # 4. GPU usage for AMD RX 6600
+            try:
+                for path in glob.glob('/sys/class/drm/card*/device/gpu_busy_percent'):
+                    with open(path, 'r') as f:
+                        print(f'GPU {f.read().strip()}')
+                        break
+            except Exception:
+                pass
+            "]
         stdout: StdioCollector {
             onStreamFinished: {
                 let lines = text.trim().split('\n');
@@ -111,7 +139,6 @@ except Exception:
         }
     }
     
-    
     RowLayout {
         anchors.fill: parent
         anchors.margins: 15
@@ -128,17 +155,14 @@ except Exception:
             radius: 20
             clip: true
 
-            // 1. QML Native Cache (Saves seamlessly in the background)
             Settings {
                 id: mediaCache
                 category: "DashboardMedia"
                 property string lastPlayer: ""
             }
 
-            // Bind our variable directly to the cache
             property string selectedPlayerName: mediaCache.lastPlayer
 
-            // Update the cache instantly whenever we cycle to a new player
             onSelectedPlayerNameChanged: {
                 mediaCache.lastPlayer = selectedPlayerName;
             }
@@ -149,11 +173,9 @@ except Exception:
                 return rawList.filter(p => !p.dbusName.includes("playerctld"));
             }
 
-            // 2. The brain that cleanly prioritizes what to show
             property var player: {
                 if (validPlayers.length === 0) return null;
 
-                // Priority A: If ANY player is actively playing right now, snap to it and update the cache!
                 let playing = validPlayers.find(p => p.isPlaying);
                 if (playing) {
                     if (selectedPlayerName !== playing.dbusName) {
@@ -162,13 +184,11 @@ except Exception:
                     return playing;
                 }
 
-                // Priority B: Everyone is stopped. Load the cached player we saved before closing
                 if (selectedPlayerName !== "") {
                     let match = validPlayers.find(p => p.dbusName === selectedPlayerName);
                     if (match) return match;
                 }
                 
-                // Priority C: Absolute fallback if the cache is empty or the cached app was closed
                 return validPlayers[0];
             }
 
@@ -182,7 +202,7 @@ except Exception:
                 if (currentIndex === -1) currentIndex = 0;
                 
                 let nextIndex = (currentIndex + direction + validPlayers.length) % validPlayers.length;
-                selectedPlayerName = validPlayers[nextIndex].dbusName; // This automatically triggers the cache save
+                selectedPlayerName = validPlayers[nextIndex].dbusName;
             }
 
             property real progress: 0
@@ -197,10 +217,9 @@ except Exception:
                 return m + ":" + (s < 10 ? "0" : "") + s;
             }
 
-
             Timer {
                 id: mediaTimer
-                interval: 250 // Throttled to 250ms for low CPU usage while maintaining smooth animation
+                interval: 250
                 running: root.isOpen && mediaCard.player !== null
                 repeat: true
                 triggeredOnStart: true
@@ -231,7 +250,6 @@ except Exception:
                     Layout.alignment: Qt.AlignHCenter
                     spacing: 8
 
-                    // --- LEFT ARROW ---
                     Text {
                         text: ""
                         color: Colors.text
@@ -242,14 +260,13 @@ except Exception:
                         MouseArea {
                             id: leftArrowMouse
                             anchors.fill: parent
-                            anchors.margins: -10 // Expands click target area
+                            anchors.margins: -10
                             enabled: mediaCard.validPlayers.length > 1
                             cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                             onClicked: mediaCard.cyclePlayer(-1)
                         }
                     }
 
-                    // --- ALBUM ART CONTAINER ---
                     Item {
                         Layout.preferredWidth: 140
                         Layout.preferredHeight: 140
@@ -318,7 +335,6 @@ except Exception:
                         }
                     }
 
-                    // --- RIGHT ARROW ---
                     Text {
                         text: ""
                         color: Colors.text
@@ -405,16 +421,10 @@ except Exception:
                     }
                     
                     Text { 
-                        // 💡 Normalize the status to a lowercase string so it always matches reliably
                         property string currentLoop: mediaCard.player ? mediaCard.player.loopState.toString().toLowerCase() : "none"
-                        
-                        // 1 / track = 󰑘 (Loop Track) | 0 / 2 / playlist / none = 󰑖 (Standard Loop)
                         text: (currentLoop === "1" || currentLoop === "track") ? "󰑘" : "󰑖"
-                        
-                        // Highlight if it's not "none" (0)
                         color: (currentLoop === "0" || currentLoop === "none") ? Colors.text : Colors.workspaceactive
                         opacity: (currentLoop === "0" || currentLoop === "none") ? 0.5 : 1.0
-                        
                         font.pixelSize: 18 
                         
                         MouseArea { 
@@ -423,10 +433,7 @@ except Exception:
                             
                             onClicked: {
                                 if (!mediaCard.player) return;
-                                
                                 let nextState = "none";
-                                
-                                // None -> Playlist -> Track -> None
                                 if (parent.currentLoop === "0" || parent.currentLoop === "none") {
                                     nextState = "playlist";
                                 } else if (parent.currentLoop === "2" || parent.currentLoop === "playlist") {
@@ -434,8 +441,6 @@ except Exception:
                                 } else {
                                     nextState = "none";
                                 }
-                                
-                                // 💡 playerctl strictly requires lowercase arguments
                                 Quickshell.execDetached({ command: ["playerctl", "loop", nextState] });
                             }
                         }
@@ -464,25 +469,123 @@ except Exception:
                 id: quickSettings
                 Layout.fillWidth: true
                 Layout.preferredHeight: 46 
-                Layout.maximumHeight: 46 // 💡 This forces the buttons to never stretch vertically
+                Layout.maximumHeight: 46
                 spacing: 10
                 
                 property bool btOn: Bluetooth.defaultAdapter.enabled
                 property bool caffeineOn: false
                 property bool gameOn: false
+                property bool netOn: Networking.connectivity === NetworkConnectivity.Full
+                property bool wifiOn: Networking.wifiEnabled && Networking.wifiHardwareEnabled
 
-                // 💡 Modified Bluetooth Toggle with Split Button & Arrow
+                property bool hasWifi: {
+                    let count = Networking.devices.count; 
+                    let devices = Networking.devices.values;
+                    for (let i = 0; i < count; i++) {
+                        if (devices[i] && devices[i].type === NetworkDeviceType.Wifi) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                property bool isActive: hasWifi ? wifiOn : netOn
+
+                // 💡 Network / Wi-Fi Toggle with Split Button & Arrow
                 Rectangle { 
                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 12
-                    color: quickSettings.btOn ? Colors.workspaceactive : "transparent"
-                    border.color: quickSettings.btOn ? "transparent" : Colors.border; border.width: quickSettings.btOn ? 0 : 2
-                    clip: true // Prevents inner items from drawing outside the rounded corners
+                    color: quickSettings.isActive ? Colors.workspaceactive : "transparent"
+                    border.color: quickSettings.isActive ? "transparent" : Colors.border; 
+                    border.width: quickSettings.isActive ? 0 : 2
+                    clip: true
                     
                     RowLayout {
                         anchors.fill: parent
                         spacing: 0
                         
                         // Main Toggle Area
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            
+                            Text { 
+                                anchors.centerIn: parent
+                                text: quickSettings.hasWifi 
+                                    ? (quickSettings.isActive ? "󰖩" : "󰖪") 
+                                    : (quickSettings.isActive ? "󰈀" : "󰈂")
+                                color: quickSettings.isActive ? Colors.background : Colors.text
+                                opacity: quickSettings.isActive ? 1.0 : 0.7
+                                font.pixelSize: 20 
+                            }
+                            
+                            Process {
+                                id: netToggleCommand
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    if (quickSettings.hasWifi) {
+                                        Networking.wifiEnabled = !Networking.wifiEnabled;
+                                    } else {
+                                        if (quickSettings.netOn) {
+                                            netToggleCommand.command = ["nmcli", "networking", "off"]
+                                        } else {
+                                            netToggleCommand.command = ["nmcli", "networking", "on"]
+                                        }
+                                        netToggleCommand.running = true 
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Mini Separator Line
+                        Rectangle {
+                            width: 1
+                            Layout.fillHeight: true
+                            Layout.topMargin: 8
+                            Layout.bottomMargin: 8
+                            color: quickSettings.isActive ? Colors.background : Colors.border
+                            opacity: 0.4
+                        }
+                        
+                        // Menu Dropdown Arrow
+                        Item {
+                            Layout.preferredWidth: 25
+                            Layout.fillHeight: true
+                            
+                            Text { 
+                                anchors.centerIn: parent
+                                text: root.showNetworkMenu ? "" : ""
+                                color: quickSettings.isActive ? Colors.background : Colors.text
+                                opacity: 0.9; font.pixelSize: 14 
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    // 💡 Toggle self and close the other if opening
+                                    root.showNetworkMenu = !root.showNetworkMenu;
+                                    if (root.showNetworkMenu) {
+                                        root.showBluetoothMenu = false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 💡 Bluetooth Toggle with Split Button & Arrow
+                Rectangle { 
+                    Layout.fillWidth: true; Layout.fillHeight: true; radius: 12
+                    color: quickSettings.btOn ? Colors.workspaceactive : "transparent"
+                    border.color: quickSettings.btOn ? "transparent" : Colors.border; border.width: quickSettings.btOn ? 0 : 2
+                    clip: true
+                    
+                    RowLayout {
+                        anchors.fill: parent
+                        spacing: 0
+                        
                         Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
@@ -504,7 +607,6 @@ except Exception:
                             }
                         }
                         
-                        // Mini Separator Line
                         Rectangle {
                             width: 1
                             Layout.fillHeight: true
@@ -514,21 +616,26 @@ except Exception:
                             opacity: 0.4
                         }
                         
-                        // Menu Dropdown Arrow
                         Item {
                             Layout.preferredWidth: 25
                             Layout.fillHeight: true
                             
                             Text { 
                                 anchors.centerIn: parent
-                                text: root.showBluetoothMenu ? "" : "" // Nerd font chevron up/down
+                                text: root.showBluetoothMenu ? "" : ""
                                 color: quickSettings.btOn ? Colors.background : Colors.text
                                 opacity: 0.9; font.pixelSize: 14 
                             }
                             
                             MouseArea {
                                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                onClicked: root.showBluetoothMenu = !root.showBluetoothMenu
+                                onClicked: {
+                                    // 💡 Toggle self and close the other if opening
+                                    root.showBluetoothMenu = !root.showBluetoothMenu;
+                                    if (root.showBluetoothMenu) {
+                                        root.showNetworkMenu = false;
+                                    }
+                                }
                             }
                         }
                     }
@@ -571,7 +678,7 @@ except Exception:
             Loader {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                active: !root.showBluetoothMenu // Unloads from memory when BT menu is open
+                active: !root.showBluetoothMenu && !root.showNetworkMenu
                 visible: status === Loader.Ready
                 
                 sourceComponent: Component {
@@ -582,12 +689,25 @@ except Exception:
             Loader {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                active: root.showBluetoothMenu // Only exists in memory when requested
+                active: root.showBluetoothMenu
                 visible: status === Loader.Ready
                 
                 sourceComponent: Component {
                     BluetoothMenu {
                         onCloseRequested: root.showBluetoothMenu = false
+                    }
+                }
+            }
+
+            Loader {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                active: root.showNetworkMenu
+                visible: status === Loader.Ready
+                
+                sourceComponent: Component {
+                    NetworkMenu {
+                        onCloseRequested: root.showNetworkMenu = false
                     }
                 }
             }
@@ -714,8 +834,8 @@ with open('/proc/net/dev', 'r') as f:
                                 if (prevRx > 0 && prevTime > 0) {
                                     let dt = (now - prevTime) / 1000.0;
                                     if (dt > 0) {
-                                        let rxDiff = Math.max(0, rx - prevRx) * 8; // bits
-                                        let txDiff = Math.max(0, tx - prevTx) * 8; // bits
+                                        let rxDiff = Math.max(0, rx - prevRx) * 8;
+                                        let txDiff = Math.max(0, tx - prevTx) * 8;
                                         
                                         netCard.downSpeed = (rxDiff / dt) / 1000000; 
                                         netCard.upSpeed = (txDiff / dt) / 1000000;   
@@ -912,7 +1032,7 @@ with open('/proc/net/dev', 'r') as f:
                 }
             }
 
-            // 2. Audio & Mic Capsule Pod (with Background Fill Effect)
+            // 2. Audio & Mic Capsule Pod
             Rectangle {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.fillWidth: true
@@ -940,7 +1060,6 @@ with open('/proc/net/dev', 'r') as f:
 
                     Item { Layout.fillHeight: true }
 
-                    // Master Volume Button with Media Arc Style & Percentage
                     ColumnLayout {
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 2
@@ -1023,7 +1142,6 @@ with open('/proc/net/dev', 'r') as f:
                         }
                     }
 
-                    // Microphone Button with Media Arc Style & Percentage
                     ColumnLayout {
                         Layout.alignment: Qt.AlignHCenter
                         spacing: 2
