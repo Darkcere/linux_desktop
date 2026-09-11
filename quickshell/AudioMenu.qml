@@ -191,7 +191,22 @@ Item {
 
                         Text { 
                             width: parent.width
-                            text: props ? (props["application.name"] || props["media.name"] || modelData.name || "Unknown App") : "Unknown App"
+                            text: {
+                                if (!props) return "Unknown App";
+                                
+                                let appName = props["application.name"] || "";
+                                let mediaName = props["media.name"] || "";
+                                
+                                if (appName && mediaName && appName !== mediaName) {
+                                    return appName + " : " + mediaName;
+                                } else if (appName) {
+                                    return appName;
+                                } else if (mediaName) {
+                                    return mediaName;
+                                } else {
+                                    return modelData.name || "Unknown App";
+                                }
+                            }
                             color: Colors.text
                             elide: Text.ElideRight
                             font.pixelSize: 14

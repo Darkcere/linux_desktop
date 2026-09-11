@@ -40,7 +40,7 @@ Text {
             BarToolTip {
                 targetItem: root
                 active: clockHover.hovered
-                text: "Left Click to toggle seconds"
+                text: "Left Click to toggle seconds and date"
                 topMargin: 23
             }
         }

@@ -14,8 +14,17 @@ Item {
     property bool isOpen: false
     property bool showBluetoothMenu: false
     property bool showNetworkMenu: false
+    property bool showNightLightMenu: false
     signal closeRequested()
-
+    // 💡 THE FIX: Dashboard now holds the MASTER settings memory
+    Settings {
+        id: nlSettings
+        category: "NightLight"
+        property int temperature: 4500
+        property bool scheduleEnabled: false
+        property string startTime: "20:00"
+        property string endTime: "07:00"
+    }
     Shortcut {
         sequence: "Escape"
         onActivated: root.closeRequested()
@@ -50,7 +59,16 @@ Item {
             }
         }
     }
-
+    Process {
+        id: getNightLightState
+        command: ["pgrep", "-x", "hyprsunset"] 
+        running: root.isOpen 
+        stdout: StdioCollector {
+            onStreamFinished: {
+                quickSettings.nlOn = (text.trim() !== "");
+            }
+        }
+    }
     Process {
         id: getGameState
         command: ["bash", "-c", "bash ~/.config/Ax-Shell/scripts/gamemode.sh check"]
@@ -477,7 +495,8 @@ Item {
                 property bool gameOn: false
                 property bool netOn: Networking.connectivity === NetworkConnectivity.Full
                 property bool wifiOn: Networking.wifiEnabled && Networking.wifiHardwareEnabled
-
+                
+                property bool nlOn: false
                 property bool hasWifi: {
                     let count = Networking.devices.count; 
                     let devices = Networking.devices.values;
@@ -568,6 +587,7 @@ Item {
                                     root.showNetworkMenu = !root.showNetworkMenu;
                                     if (root.showNetworkMenu) {
                                         root.showBluetoothMenu = false;
+                                        root.showNightLightMenu = false;
                                     }
                                 }
                             }
@@ -634,6 +654,7 @@ Item {
                                     root.showBluetoothMenu = !root.showBluetoothMenu;
                                     if (root.showBluetoothMenu) {
                                         root.showNetworkMenu = false;
+                                        root.showNightLightMenu = false;
                                     }
                                 }
                             }
@@ -657,7 +678,76 @@ Item {
                         }
                     }
                 }
-                
+                // 💡 Night Light Toggle with Split Button & Arrow
+                Rectangle { 
+                    Layout.fillWidth: true; Layout.fillHeight: true; radius: 12
+                    color: quickSettings.nlOn ? Colors.workspaceactive : "transparent"
+                    border.color: quickSettings.nlOn ? "transparent" : Colors.border; border.width: quickSettings.nlOn ? 0 : 2
+                    clip: true
+                    
+                    RowLayout {
+                        anchors.fill: parent
+                        spacing: 0
+                        
+                        Item {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            
+                            Text { 
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                // 💡 Nudge the icon to the right. Adjust this number (e.g., 2 to 12) until it looks perfectly centered to you.
+                                anchors.horizontalCenterOffset: 4 
+                                text: quickSettings.nlOn ? "󰖔" : "󰖔" // Moon icon
+                                color: quickSettings.nlOn ? Colors.background : Colors.text
+                                opacity: quickSettings.nlOn ? 1.0 : 0.7
+                                font.pixelSize: 20 
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    quickSettings.nlOn = !quickSettings.nlOn;
+                                    let temp = nlSettings.temperature;
+                                    let cmd = quickSettings.nlOn ? "pkill -x hyprsunset || true; sleep 0.1; nohup hyprsunset -t " + temp + " >/dev/null 2>&1 & disown" : "pkill -x hyprsunset";
+                                    Quickshell.execDetached({ command: ["bash", "-c", cmd] });
+                                }
+                            }
+                        }
+                        
+                        Rectangle {
+                            width: 1
+                            Layout.fillHeight: true
+                            Layout.topMargin: 8
+                            Layout.bottomMargin: 8
+                            color: quickSettings.nlOn ? Colors.background : Colors.border
+                            opacity: 0.4
+                        }
+                        
+                        Item {
+                            Layout.preferredWidth: 25
+                            Layout.fillHeight: true
+                            
+                            Text { 
+                                anchors.centerIn: parent
+                                text: root.showNightLightMenu ? "" : ""
+                                color: quickSettings.nlOn ? Colors.background : Colors.text
+                                opacity: 0.9; font.pixelSize: 14 
+                            }
+                            
+                            MouseArea {
+                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.showNightLightMenu = !root.showNightLightMenu;
+                                    if (root.showNightLightMenu) {
+                                        root.showBluetoothMenu = false;
+                                        root.showNetworkMenu = false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 Rectangle { 
                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 12
                     color: quickSettings.gameOn ? Colors.workspaceactive : "transparent"
@@ -678,7 +768,7 @@ Item {
             Loader {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                active: !root.showBluetoothMenu && !root.showNetworkMenu
+                active: !root.showBluetoothMenu && !root.showNetworkMenu && !root.showNightLightMenu
                 visible: status === Loader.Ready
                 
                 sourceComponent: Component {
@@ -708,6 +798,18 @@ Item {
                 sourceComponent: Component {
                     NetworkMenu {
                         onCloseRequested: root.showNetworkMenu = false
+                    }
+                }
+            }
+            Loader {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                active: root.showNightLightMenu
+                visible: status === Loader.Ready
+                
+                sourceComponent: Component {
+                    NightLightMenu {
+                        onCloseRequested: root.showNightLightMenu = false
                     }
                 }
             }

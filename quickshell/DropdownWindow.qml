@@ -19,7 +19,7 @@ PanelWindow {
     function getDropWidth(view) {
         if (view === "tray") return trayMenuView.item ? trayMenuView.item.implicitWidth : 600; 
         switch(view) {
-            case "dashboard": return 980;
+            case "dashboard": return 1080;
             case "wallpaper":
             case "clipboard": return 950;
             case "powermenu": return 400;
@@ -58,6 +58,7 @@ PanelWindow {
     signal closeRequested()
     onCloseRequested: {
         root.activeView = ""
+        root.pendingAppSearch = "" // 💡 Clear leftover search state on close
     }
 
     // --- PROTECTED TOGGLES ---
@@ -97,8 +98,7 @@ PanelWindow {
     anchors { top: true; left: true; right: true; bottom: true }
     height: isOpen ? root.currentDropHeight : 0
     
-    exclusiveZone: 0
-
+    
     color: "transparent"
     visible: isOpen || visualBox.opacity > 0.01 
 

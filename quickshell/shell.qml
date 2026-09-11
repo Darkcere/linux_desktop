@@ -3,9 +3,35 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import QtQuick
 import Quickshell.Io
-
+import QtCore
 ShellRoot {
     id: root
+    Settings {
+        id: nlSettings
+        category: "NightLight"
+        property int temperature: 4500
+        property bool scheduleEnabled: false
+        property string startTime: "20:00"
+        property string endTime: "07:00"
+    }
+
+    Timer {
+        interval: 60000 // Checks every minute
+        running: nlSettings.scheduleEnabled
+        repeat: true
+        onTriggered: {
+            let d = new Date();
+            let h = d.getHours();
+            let m = d.getMinutes();
+            let currentStr = (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
+            
+            if (currentStr === nlSettings.startTime) {
+                Quickshell.execDetached({ command: ["bash", "-c", "pkill -x hyprsunset || true; sleep 0.1; nohup hyprsunset -t " + nlSettings.temperature + " >/dev/null 2>&1 & disown"] });
+            } else if (currentStr === nlSettings.endTime) {
+                Quickshell.execDetached({ command: ["bash", "-c", "pkill -x hyprsunset"] });
+            }
+        }
+    }
     Connections {
         target: Quickshell
         function onReloadCompleted() { Quickshell.inhibitReloadPopup() }

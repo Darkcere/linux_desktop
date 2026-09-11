@@ -67,7 +67,7 @@ PanelWindow {
                     return;
                 }
 
-                let timeout = 10000; 
+                let timeout = 6000; 
                 if (notif.notification) {
                     let urg = notif.notification.urgency;
                     let expireMs = notif.notification.expireTimeout;

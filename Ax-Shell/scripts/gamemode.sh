@@ -24,12 +24,10 @@ toggle_gamemode() {
             keyword general:border_size 1;\
             keyword decoration:rounding 0;\
             "
-        hyprctl dispatch global quickshell:toggleDnd
         powerprofilesctl set performance
         exit
     fi
     hyprctl reload
-    hyprctl dispatch global quickshell:toggleDnd
     powerprofilesctl set balanced
 }
 
