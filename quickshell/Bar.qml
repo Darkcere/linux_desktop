@@ -16,7 +16,8 @@ PanelWindow {
     property bool dndEnabled: false
 
     signal toggleLauncherRequested()
-    
+    signal toggleDashboardRequested()
+    signal togglePowerRequested()
     // --- HELPER PROPERTIES FOR CLEANER LOGIC ---
     property bool isRightAlignedMode: menuHandler && (menuHandler.lastActiveView === "tray" || menuHandler.lastActiveView === "audio" || menuHandler.lastActiveView === "notifications")
     property bool isRightMenuOpen: menuHandler && (menuHandler.activeView === "tray" || menuHandler.activeView === "audio" || menuHandler.activeView === "notifications")
@@ -142,12 +143,22 @@ PanelWindow {
                                     cursorShape: Qt.PointingHandCursor
                                 }
                                 TapHandler {
+                                    acceptedButtons: Qt.LeftButton
+                                    onTapped: mainBarWindow.toggleDashboardRequested()
+                                }
+
+                                TapHandler {
+                                    acceptedButtons: Qt.RightButton
                                     onTapped: mainBarWindow.toggleLauncherRequested()
+                                }
+                                TapHandler {
+                                    acceptedButtons: Qt.MiddleButton
+                                    onTapped: mainBarWindow.togglePowerRequested()
                                 }
                                 BarToolTip {
                                     targetItem: archlogo
                                     active: archHover.hovered
-                                    text: "Open Launcher"
+                                    text: "<b>Left Click:</b> Open Dashboard<br><b>Right Click:</b> Open Launcher<br><b>Middle Click:<b> Open Power Menu"
                                     topMargin: 24
                                 }
                             }
@@ -168,7 +179,7 @@ PanelWindow {
                             spacing: 5 
                             Behavior on opacity { NumberAnimation { duration: 150 } }
                             
-                            Clock { z: -1; anchors.verticalCenter: parent.verticalCenter }
+                            Clock { z: -1; anchors.verticalCenter: parent.verticalCenter; isDropdownOpen: mainBarWindow.isDropdownOpen }
                             Mediaplayer { z: 10; anchors.verticalCenter: parent.verticalCenter; isDashboardopen: isDropdownOpen && menuHandler.lastActiveView === "dashboard" }
                         }
                     }
@@ -241,18 +252,24 @@ PanelWindow {
                             
                             // --- 3. TRAY ---
                             Tray { 
+                                id: trayModule // Give it an ID so we can reference it easily
+                                
                                 property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "tray")
+                                
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: isActive ? implicitWidth : 0
                                 opacity: isActive ? 1 : 0
                                 clip: true 
-                                visible: width > 0 
+                                
+                                // 💡 THE FIX: Use the exposed integer property!
+                                visible: trayModule.itemCount > 0 
                                 
                                 Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
                                 Behavior on opacity { NumberAnimation { duration: 150 } }
                                 
                                 menuHandler: mainBarWindow.menuHandler
                             }
+                            
                         }
                     }
                 }

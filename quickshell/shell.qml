@@ -6,32 +6,7 @@ import Quickshell.Io
 import QtCore
 ShellRoot {
     id: root
-    Settings {
-        id: nlSettings
-        category: "NightLight"
-        property int temperature: 4500
-        property bool scheduleEnabled: false
-        property string startTime: "20:00"
-        property string endTime: "07:00"
-    }
-
-    Timer {
-        interval: 60000 // Checks every minute
-        running: nlSettings.scheduleEnabled
-        repeat: true
-        onTriggered: {
-            let d = new Date();
-            let h = d.getHours();
-            let m = d.getMinutes();
-            let currentStr = (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m;
-            
-            if (currentStr === nlSettings.startTime) {
-                Quickshell.execDetached({ command: ["bash", "-c", "pkill -x hyprsunset || true; sleep 0.1; nohup hyprsunset -t " + nlSettings.temperature + " >/dev/null 2>&1 & disown"] });
-            } else if (currentStr === nlSettings.endTime) {
-                Quickshell.execDetached({ command: ["bash", "-c", "pkill -x hyprsunset"] });
-            }
-        }
-    }
+    property var _initNightLight: NightLightService
     Connections {
         target: Quickshell
         function onReloadCompleted() { Quickshell.inhibitReloadPopup() }
@@ -44,6 +19,7 @@ ShellRoot {
             }
         }
     }
+    
     property bool isScreenLocked: false
 
     // 💡 THE FIX: Moved the lock listener to the main shell and throttled it to 250ms
@@ -155,7 +131,7 @@ ShellRoot {
         onPressed: dropdownLoader.item?.toggleDashboard() 
     }
     
-        GlobalShortcut { name: "toggleTools"; onPressed: dropdownLoader.item?.toggleTools() }
+    GlobalShortcut { name: "toggleTools"; onPressed: dropdownLoader.item?.toggleTools() }
     GlobalShortcut { name: "togglePowerMenu"; onPressed: dropdownLoader.item?.togglePowerMenu() }
     GlobalShortcut { name: "toggleClipboard"; onPressed: dropdownLoader.item?.toggleClipboard() }
     GlobalShortcut { name: "toggleLauncher"; onPressed: dropdownLoader.item?.toggleApps() }
@@ -195,6 +171,8 @@ ShellRoot {
                 isDropdownOpen: dropdownLoader.item?.isOpen ?? false
                 dropdownWidth: dropdownLoader.item?.currentDropWidth ?? 0
                 onToggleLauncherRequested: dropdownLoader.item?.toggleApps()
+                onToggleDashboardRequested: dropdownLoader.item?.toggleDashboard()
+                onTogglePowerRequested: dropdownLoader.item?.togglePowerMenu()
             }
         }
     }

@@ -14,20 +14,11 @@ Rectangle {
 
     signal closeRequested()
 
-    Settings {
-        id: nlSettings
-        category: "NightLight"
-        property int temperature: 4500
-        property bool scheduleEnabled: false
-        property string startTime: "20:00"
-        property string endTime: "07:00"
-    }
-
     Timer {
         id: scrollTimer
         interval: 250
         repeat: false
-        onTriggered: applyNightLight()
+        onTriggered: NightLightService.applyNightLight(true)
     }
 
     function applyNightLight() {
@@ -97,16 +88,19 @@ Rectangle {
                 to: 6500   
                 stepSize: 100
                 
-                Component.onCompleted: {
-                    tempSlider.value = nlSettings.temperature;
-                }
+                // 💡 THE FIX: Set the initial value directly so it loads 
+                // BEFORE onValueChanged has a chance to trigger
+                value: NightLightService.temperature
 
                 onValueChanged: {
-                    nlSettings.temperature = Math.round(value);
+                    // Only update the setting if it actually differs from the slider
+                    if (NightLightService.temperature !== Math.round(value)) {
+                        NightLightService.temperature = Math.round(value);
+                    }
                 }
                 
                 onPressedChanged: {
-                    if (!pressed) applyNightLight();
+                    if (!pressed) NightLightService.applyNightLight(true);
                 }
                 
                 MouseArea {
@@ -182,33 +176,33 @@ Rectangle {
                     
                     Rectangle {
                         width: 36; height: 20; radius: 10
-                        color: nlSettings.scheduleEnabled ? Colors.workspaceactive : Colors.border
+                        color: NightLightService.scheduleEnabled ? Colors.workspaceactive : Colors.border
                         
                         Rectangle {
                             width: 16; height: 16; radius: 8
                             color: Colors.background
                             anchors.verticalCenter: parent.verticalCenter
-                            x: nlSettings.scheduleEnabled ? parent.width - width - 2 : 2
+                            x: NightLightService.scheduleEnabled ? parent.width - width - 2 : 2
                             Behavior on x { NumberAnimation { duration: 150 } }
                         }
                         
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: nlSettings.scheduleEnabled = !nlSettings.scheduleEnabled
+                            onClicked: NightLightService.scheduleEnabled = !NightLightService.scheduleEnabled
                         }
                     }
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
-                    opacity: nlSettings.scheduleEnabled ? 1.0 : 0.4
-                    enabled: nlSettings.scheduleEnabled
+                    opacity: NightLightService.scheduleEnabled ? 1.0 : 0.4
+                    enabled: NightLightService.scheduleEnabled
                     
                     Text { text: "From"; color: Colors.text; font.pixelSize: 12; Layout.preferredWidth: 35 }
                     
                     TextField {
-                        text: nlSettings.startTime
+                        text: NightLightService.startTime
                         color: Colors.workspaceactive
                         font.pixelSize: 14
                         font.weight: Font.Bold
@@ -225,7 +219,7 @@ Rectangle {
                         }
                         
                         onEditingFinished: {
-                            if (text.length === 5) nlSettings.startTime = text;
+                            if (text.length === 5) NightLightService.startTime = text;
                         }
                     }
                     
@@ -234,7 +228,7 @@ Rectangle {
                     Text { text: "To"; color: Colors.text; font.pixelSize: 12 }
                     
                     TextField {
-                        text: nlSettings.endTime
+                        text: NightLightService.endTime
                         color: Colors.workspaceactive
                         font.pixelSize: 14
                         font.weight: Font.Bold
@@ -251,7 +245,7 @@ Rectangle {
                         }
                         
                         onEditingFinished: {
-                            if (text.length === 5) nlSettings.endTime = text;
+                            if (text.length === 5) NightLightService.endTime = text;
                         }
                     }
                 }

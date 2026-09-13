@@ -324,7 +324,7 @@ Scope {
                                         Behavior on opacity { NumberAnimation { duration: 200 } }
                                     }
                                 }
-                            }
+                            } 
 
                             // ==========================================
                             // BOTTOM LEFT: MEDIA PLAYER

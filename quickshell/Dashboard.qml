@@ -16,15 +16,7 @@ Item {
     property bool showNetworkMenu: false
     property bool showNightLightMenu: false
     signal closeRequested()
-    // 💡 THE FIX: Dashboard now holds the MASTER settings memory
-    Settings {
-        id: nlSettings
-        category: "NightLight"
-        property int temperature: 4500
-        property bool scheduleEnabled: false
-        property string startTime: "20:00"
-        property string endTime: "07:00"
-    }
+
     Shortcut {
         sequence: "Escape"
         onActivated: root.closeRequested()
@@ -194,19 +186,21 @@ Item {
             property var player: {
                 if (validPlayers.length === 0) return null;
 
-                let playing = validPlayers.find(p => p.isPlaying);
-                if (playing) {
-                    if (selectedPlayerName !== playing.dbusName) {
-                        selectedPlayerName = playing.dbusName; 
-                    }
-                    return playing;
-                }
-
+                // 1. Prioritize the manually selected player (from cache or arrow clicks)
                 if (selectedPlayerName !== "") {
                     let match = validPlayers.find(p => p.dbusName === selectedPlayerName);
                     if (match) return match;
                 }
+
+                // 2. If no valid selection exists, default to the currently playing media
+                let playing = validPlayers.find(p => p.isPlaying);
+                if (playing) {
+                    selectedPlayerName = playing.dbusName;
+                    return playing;
+                }
                 
+                // 3. Fallback to the first available player if nothing is playing
+                selectedPlayerName = validPlayers[0].dbusName;
                 return validPlayers[0];
             }
 
@@ -696,9 +690,8 @@ Item {
                             Text { 
                                 anchors.verticalCenter: parent.verticalCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                // 💡 Nudge the icon to the right. Adjust this number (e.g., 2 to 12) until it looks perfectly centered to you.
                                 anchors.horizontalCenterOffset: 4 
-                                text: quickSettings.nlOn ? "󰖔" : "󰖔" // Moon icon
+                                text: quickSettings.nlOn ? "󰖔" : "󰖔" 
                                 color: quickSettings.nlOn ? Colors.background : Colors.text
                                 opacity: quickSettings.nlOn ? 1.0 : 0.7
                                 font.pixelSize: 20 
@@ -708,9 +701,11 @@ Item {
                                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     quickSettings.nlOn = !quickSettings.nlOn;
-                                    let temp = nlSettings.temperature;
-                                    let cmd = quickSettings.nlOn ? "pkill -x hyprsunset || true; sleep 0.1; nohup hyprsunset -t " + temp + " >/dev/null 2>&1 & disown" : "pkill -x hyprsunset";
-                                    Quickshell.execDetached({ command: ["bash", "-c", cmd] });
+                                    if (quickSettings.nlOn) {
+                                        NightLightService.applyNightLight(false); // force apply
+                                    } else {
+                                        NightLightService.stopNightLight();
+                                    }
                                 }
                             }
                         }

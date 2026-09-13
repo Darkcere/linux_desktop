@@ -1,0 +1,32 @@
+singleton NightLightService NightLightService.qml
+singleton Colors Colors.qml
+singleton AudioService AudioService.qml
+singleton NotificationManager NotificationManager.qml
+
+NotificationPopup NotificationPopup.qml
+Dashboard Dashboard.qml
+NightLightMenu NightLightMenu.qml
+Bar Bar.qml
+Osd Osd.qml
+DropdownWindow DropdownWindow.qml
+LockScreen LockScreen.qml
+DashboardCalendar DashboardCalendar.qml
+BluetoothMenu BluetoothMenu.qml
+NetworkMenu NetworkMenu.qml
+Mediaplayer Mediaplayer.qml
+Tray Tray.qml
+BarToolTip BarToolTip.qml
+AudioModule AudioModule.qml
+Workspaces Workspaces.qml
+Clock Clock.qml
+Cavavisualizer Cavavisualizer.qml
+WallpaperPicker WallpaperPicker.qml
+TrayMenu TrayMenu.qml
+Clipboard Clipboard.qml
+Apps Apps.qml
+Tools Tools.qml
+NotificationCenter NotificationCenter.qml
+AudioMenu AudioMenu.qml
+PowerMenu PowerMenu.qml
+PolkitDialog PolkitDialog.qml
+NotificationGroup NotificationGroup.qml

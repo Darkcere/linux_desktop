@@ -104,7 +104,7 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Overlay 
     WlrLayershell.namespace: "dropdowns"
-    WlrLayershell.keyboardFocus: isOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     
     // --- CLICK AND KEY CATCHER ---
     MouseArea { 

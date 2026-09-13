@@ -8,7 +8,7 @@ Item {
     visible: trayRepeater.count > 0
     implicitWidth: trayContentRow.width + 8
     implicitHeight: 24
-
+    readonly property int itemCount: trayRepeater.count
     required property var menuHandler
 
     property Item hoveredItem: null
@@ -19,7 +19,6 @@ Item {
         anchors.fill: parent
         color: '#00040e0d'
         radius: 5
-
         Rectangle {
             implicitWidth: 2
             implicitHeight: 13

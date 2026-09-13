@@ -7,6 +7,12 @@ Text {
     // --- STATE TRACKING ---
     property bool showSeconds: false
     property bool tooltip: true
+    property bool isDropdownOpen: false
+    onIsDropdownOpenChanged: {
+        if (isDropdownOpen) {
+            root.showSeconds = false
+        }
+    }
     // Provides the time data
     SystemClock {
         id: clock

@@ -9,7 +9,10 @@ Item {
     property bool isOpen: false
 
     signal closeRequested()
-
+    Shortcut {
+        sequence: "Escape"
+        onActivated: root.closeRequested()
+    }
     // 💡 RESTORED: Auto width and height based on the dynamic layout!
     implicitWidth: menuLayout.implicitWidth 
     implicitHeight: menuLayout.implicitHeight + 12
