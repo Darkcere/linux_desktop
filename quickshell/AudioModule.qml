@@ -7,7 +7,7 @@ Row {
     
     // Using simple spacing on a basic Row is drastically faster than RowLayout
     spacing: 4 
-    
+    property bool audiotooltip: true
     property color activeColor: AudioService.protectionTriggered ? Colors.workspaceurgent : Colors.text
     TapHandler {
         acceptedButtons: Qt.RightButton
@@ -56,7 +56,7 @@ Row {
             if (AudioService.sink?.audio?.muted) return "󰝟"
             let vol = AudioService.sink?.audio?.volume ?? 0
             if (vol < 0.3) return "󰕿"
-            if (vol < 0.7) return "󰖀"
+            if (vol < 0.5) return "󰖀"
             return "󰕾"
         }
         font.pixelSize: 15
@@ -89,7 +89,7 @@ Row {
     BarToolTip {
         targetItem: root
 
-        active: moduleHover.hovered 
+        active: moduleHover.hovered && audiotooltip
         
         text: {
             if (!active) return ""; // 💡 Wakes up ONLY when hovered!

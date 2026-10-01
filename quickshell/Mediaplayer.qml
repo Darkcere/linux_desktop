@@ -50,7 +50,8 @@ Rectangle {
     Row {
         id: mainRow
         anchors.fill: parent
-        anchors.leftMargin: 4
+        anchors.leftMargin: 1
+        anchors.topMargin: 1
         spacing: 6
         Loader {   
             active: root.player !== null && !root.isDashboardopen// Unloads from memory when BT menu is open
@@ -173,6 +174,7 @@ Rectangle {
         Cavavisualizer {
             // 💡 THE FIX: Explicitly center vertically
             anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: -1
             z: -1
         }
         
@@ -180,13 +182,13 @@ Rectangle {
             id: mediaTitle
             // 💡 THE FIX: Explicitly center vertically
             anchors.verticalCenter: parent.verticalCenter
-            
+            anchors.verticalCenterOffset: -1
             visible: root.title && !root.isDashboardopen
             HoverHandler { id: mediaHover }
             
             width: Math.min(implicitWidth, 200)
             
-            text: root.artist.length > 0 ? root.title + " • " + root.artist : root.title
+            text: root.title
             color: Colors.text
             font.pixelSize: 10
             font.weight: Font.Medium
@@ -207,7 +209,7 @@ Rectangle {
                 let artistInfo = root.artist ? "\n󰠃  " + root.artist : "";
                 return "󰝚  " + root.title + artistInfo + albumInfo;
             }
-            topMargin: 21
+            topMargin: 20
         }
     }
 }

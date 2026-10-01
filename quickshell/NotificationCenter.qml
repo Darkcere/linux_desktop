@@ -18,7 +18,6 @@ Item {
         active: root.isOpen 
         
         // Optional: A quick fade-in so it doesn't feel jarring when it instantiates
-        Behavior on opacity { NumberAnimation { duration: 150 } }
         opacity: status === Loader.Ready ? 1 : 0
         
         sourceComponent: Component {

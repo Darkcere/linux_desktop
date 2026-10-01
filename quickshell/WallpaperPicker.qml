@@ -6,6 +6,7 @@ import Quickshell.Io
 import Qt5Compat.GraphicalEffects
 
 Item {
+    
     id: pickerWindow
     Shortcut {
         sequence: "Escape"

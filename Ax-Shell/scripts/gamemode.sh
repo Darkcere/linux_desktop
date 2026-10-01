@@ -1,9 +1,8 @@
 #!/usr/bin/env sh
 
-# Check if animations are disabled (game mode is active)
 check_gamemode() {
     HYPRGAMEMODE=$(hyprctl getoption animations:enabled | awk 'NR==1{print $2}')
-    if [ "$HYPRGAMEMODE" = 0 ] ; then 
+    if [ "$HYPRGAMEMODE" = 'false' ] ; then 
         echo "t"
         return 0
     else
@@ -12,26 +11,38 @@ check_gamemode() {
     fi
 }
 
-# Toggle game mode state
 toggle_gamemode() {
     HYPRGAMEMODE=$(hyprctl getoption animations:enabled | awk 'NR==1{print $2}')
-    if [ "$HYPRGAMEMODE" = 1 ] ; then
-        hyprctl --batch "\
-            keyword animations:enabled 0;\
-            keyword animation borderangle,0;\
-            keyword decoration:shadow:enabled 0;\
-            keyword decoration:blur:enabled 0;\
-            keyword general:border_size 1;\
-            keyword decoration:rounding 0;\
-            "
+    if [ "$HYPRGAMEMODE" = 'true' ] ; then
+        hyprctl eval "hl.config({
+            animations = { 
+                enabled = false, 
+                animation = { 'borderangle,0' } 
+            },
+            decoration = { 
+                shadow = { enabled = false }, 
+                blur = { enabled = false }, 
+                rounding = 0 
+            },
+            general = { 
+                border_size = 1 
+            }
+        })"
         powerprofilesctl set performance
+        
+        # Tell Quickshell to enter Game Mode (destroys UI, clears RAM, enables DND)
+        qs ipc call gamemode set true
+        
         exit
     fi
+    
     hyprctl reload
     powerprofilesctl set balanced
+    
+    # Tell Quickshell to exit Game Mode (recreates UI, disables DND)
+    qs ipc call gamemode set false
 }
 
-# Main script logic
 case "$1" in
     check)
         check_gamemode

@@ -1087,7 +1087,7 @@ with open('/proc/net/dev', 'r') as f:
                             
                             onMoved: {
                                 let val = Math.round(value);
-                                setBrightness.command = ["ddcutil", "setvcp", "10", val.toString()];
+                                setBrightness.command = ["ddcutil", "-b", "7", "--noverify", "setvcp", "10", val.toString()];
                             }
 
                             MouseArea {
@@ -1096,7 +1096,7 @@ with open('/proc/net/dev', 'r') as f:
                                 onWheel: (wheel) => {
                                     let delta = wheel.angleDelta.y > 0 ? 5 : -5;
                                     bSlider.value = Math.min(100, Math.max(0, bSlider.value + delta));
-                                    setBrightness.command = ["ddcutil", "setvcp", "10", Math.round(bSlider.value).toString()];
+                                    setBrightness.command = ["ddcutil", "-b", "7", "--noverify", "setvcp", "10", Math.round(bSlider.value).toString()];
                                     wheel.accepted = true;
                                 }
                             }
@@ -1332,7 +1332,7 @@ with open('/proc/net/dev', 'r') as f:
         command: ["python3", "-c", "
 import subprocess
 try:
-    res = subprocess.run(['ddcutil', 'getvcp', '10', '--brief'], capture_output=True, text=True, timeout=1)
+    res = subprocess.run(['ddcutil', '-b', '7', 'getvcp', '10', '--brief'], capture_output=True, text=True, timeout=3)
     parts = res.stdout.strip().split()
     if len(parts) >= 4:
         print(int(parts[3]))

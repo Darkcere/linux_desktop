@@ -262,7 +262,6 @@ EOF
                 anchors.fill: parent
                 hoverEnabled: true
                 onClicked: toolsWindow.executeSelected(index)
-                onEntered: toolsWindow.selectedIndex = index
             }
         }
     }

@@ -5,6 +5,7 @@ import Quickshell.Wayland
 PanelWindow {
     id: mainBarWindow 
     WlrLayershell.layer: WlrLayer.Top
+    property bool isGameMode: false
     property var menuHandler
     property QtObject globalTrayMenu
     property bool isDropdownOpen: false
@@ -30,8 +31,8 @@ PanelWindow {
 
     margins {
         top: 2
-        left: 7
-        right: 7
+        left: 8
+        right: 8
     }
 
     // 💡 THE FIX: Hard command instead of a suggestion
@@ -48,15 +49,21 @@ PanelWindow {
         anchors.right: mainBarWindow.isRightAlignedMode ? parent.right : undefined
         
         width: mainBarWindow.isDropdownOpen ? mainBarWindow.dropdownWidth : mainBarWindow.width
-        radius: mainBarWindow.isDropdownOpen ? 12 : 5
+        radius: mainBarWindow.isGameMode ? 0 : mainBarWindow.isDropdownOpen ? 12 : 5
         
         color: Colors.background
         border.color: Colors.border
-        border.width: 2
+        border.width: mainBarWindow.isGameMode ? 1 : 2
         clip: true 
 
-        Behavior on width { NumberAnimation { duration: menuHandler ? menuHandler.morphSpeed : 300; easing.type: Easing.OutQuart } }
-        Behavior on radius { NumberAnimation { duration: menuHandler ? menuHandler.morphSpeed : 300; easing.type: Easing.OutQuart } }
+        Behavior on width { 
+            enabled: !mainBarWindow.isGameMode // 👈 Disables animation in Game Mode
+            NumberAnimation { duration: menuHandler ? menuHandler.morphSpeed : 300; easing.type: Easing.OutQuart } 
+        }
+        Behavior on radius { 
+            enabled: !mainBarWindow.isGameMode
+            NumberAnimation { duration: menuHandler ? menuHandler.morphSpeed : 300; easing.type: Easing.OutQuart } 
+        }
 
         // --- 1. DROPDOWN BRIDGE ---
         Rectangle {
@@ -69,10 +76,10 @@ PanelWindow {
             opacity: mainBarWindow.isDropdownOpen ? 1 : 0 
             visible: opacity > 0
             
-            Rectangle { anchors.left: parent.left; width: 2; height: parent.height; color: Colors.border }
-            Rectangle { anchors.right: parent.right; width: 2; height: parent.height; color: Colors.border }
+            Rectangle { anchors.left: parent.left; width: mainBarWindow.isGameMode ? 1 : 2; height: parent.height; color: Colors.border }
+            Rectangle { anchors.right: parent.right; width: mainBarWindow.isGameMode ? 1 : 2; height: parent.height; color: Colors.border }
             
-            Behavior on opacity { NumberAnimation { duration: menuHandler ? (menuHandler.morphSpeed / 2) : 100 } }
+            Behavior on opacity {enabled: !mainBarWindow.isGameMode; NumberAnimation { duration: menuHandler ? (menuHandler.morphSpeed / 2) : 100 } }
         }
 
         // --- 2. NOTIFICATION POPUP BRIDGE ---
@@ -87,11 +94,12 @@ PanelWindow {
             opacity: (!mainBarWindow.isDropdownOpen && mainBarWindow.hasActivePopup) ? 1 : 0
             visible: opacity > 0
             
+            // THE FIX: Set height back to 2 so it doesn't slice up into the bar!
             Rectangle { 
                 anchors.left: parent.left; 
                 anchors.bottom: parent.bottom; 
                 width: 2; 
-                height: parent.height - 10; 
+                height: 2; 
                 color: Colors.border 
             }
             Rectangle { 
@@ -102,7 +110,7 @@ PanelWindow {
                 color: Colors.border 
             }
             
-            Behavior on opacity { NumberAnimation { duration: 150 } }
+            Behavior on opacity {enabled: !mainBarWindow.isGameMode; NumberAnimation { duration: 150 } }
         }
 
         Item {
@@ -127,7 +135,10 @@ PanelWindow {
                         Row {
                             spacing: 8 
                             
-                            Behavior on opacity { NumberAnimation { duration: 150 } }
+                            Behavior on opacity { 
+                                enabled: !mainBarWindow.isGameMode
+                                NumberAnimation { duration: 150 } 
+                            }
                             
                             Text {
                                 id: archlogo
@@ -135,7 +146,10 @@ PanelWindow {
                                 color: Colors.text
                                 font.pixelSize: 14
                                 anchors.verticalCenter: parent.verticalCenter
-                                Behavior on color { ColorAnimation { duration: 150 } }
+                                Behavior on color { 
+                                    enabled: !mainBarWindow.isGameMode
+                                    ColorAnimation { duration: 150 } 
+                                }
                                 
                                 // 💡 THE FIX: Zero-geometry input handling
                                 HoverHandler {
@@ -157,13 +171,13 @@ PanelWindow {
                                 }
                                 BarToolTip {
                                     targetItem: archlogo
-                                    active: archHover.hovered
+                                    active: !isGameMode && archHover.hovered
                                     text: "<b>Left Click:</b> Open Dashboard<br><b>Right Click:</b> Open Launcher<br><b>Middle Click:<b> Open Power Menu"
                                     topMargin: 24
                                 }
                             }
                             
-                            Workspaces { anchors.verticalCenter: parent.verticalCenter }
+                            Workspaces {isGameMode: mainBarWindow.isGameMode; anchors.verticalCenter: parent.verticalCenter }
                         }
                     }
                 }
@@ -177,10 +191,31 @@ PanelWindow {
                     sourceComponent: Component {
                         Row {
                             spacing: 5 
-                            Behavior on opacity { NumberAnimation { duration: 150 } }
+                            Behavior on opacity {enabled: !mainBarWindow.isGameMode; NumberAnimation { duration: 150 } }
                             
-                            Clock { z: -1; anchors.verticalCenter: parent.verticalCenter; isDropdownOpen: mainBarWindow.isDropdownOpen }
-                            Mediaplayer { z: 10; anchors.verticalCenter: parent.verticalCenter; isDashboardopen: isDropdownOpen && menuHandler.lastActiveView === "dashboard" }
+                            Clock { 
+                                id: barclock
+                                z: -1 
+                                anchors.verticalCenter: parent.verticalCenter 
+                                anchors.verticalCenterOffset: -1
+                                isDropdownOpen: mainBarWindow.isDropdownOpen 
+
+                                // 1. You must declare the HoverHandler so it can detect the mouse
+                                HoverHandler {
+                                    id: clockHover
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+
+                                // 2. Now the tooltip can read clockHover.hovered
+                                BarToolTip {
+                                    targetItem: barclock
+                                    // Hide tooltip in Game Mode to save resources
+                                    active: clockHover.hovered && !mainBarWindow.isGameMode
+                                    text: "Left Click to toggle seconds and date"
+                                    topMargin: 24
+                                }
+                            }
+                            Mediaplayer { z: 10; anchors.verticalCenter: parent.verticalCenter; isDashboardopen: isDropdownOpen && menuHandler.lastActiveView === "dashboard"; visible: !mainBarWindow.isGameMode }
                         }
                     }
                 }
@@ -201,9 +236,10 @@ PanelWindow {
                                 opacity: isActive ? 1 : 0
                                 clip: true 
                                 visible: width > 0 
+                                audiotooltip: !isGameMode && !hasActivePopup 
                                 
-                                Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
-                                Behavior on opacity { NumberAnimation { duration: 150 } }
+                                Behavior on width {NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
+                                Behavior on opacity {enabled: !mainBarWindow.isGameMode; NumberAnimation { duration: 150 } }
                             }
                             
                             // --- 2. NOTIFICATIONS ---
@@ -223,8 +259,8 @@ PanelWindow {
                                 clip: true 
                                 visible: width > 0
                                 
-                                Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
-                                Behavior on opacity { NumberAnimation { duration: 150 } }
+                                Behavior on width {NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
+                                Behavior on opacity {enabled: !mainBarWindow.isGameMode; NumberAnimation { duration: 150 } }
                                 
                                 // 💡 THE FIX: Zero-geometry right/left click separation
                                 HoverHandler {
@@ -244,7 +280,7 @@ PanelWindow {
 
                                 BarToolTip {
                                     targetItem: notificationbell
-                                    active: bellHover.hovered
+                                    active: !isGameMode && bellHover.hovered && !hasActivePopup
                                     text: "Left Click: Open Notification Center\nRight Click: Toggle DND"
                                     topMargin: 24 
                                 }
@@ -260,12 +296,12 @@ PanelWindow {
                                 width: isActive ? implicitWidth : 0
                                 opacity: isActive ? 1 : 0
                                 clip: true 
-                                
+                                traytooltip: !isGameMode && !hasActivePopup 
                                 // 💡 THE FIX: Use the exposed integer property!
                                 visible: trayModule.itemCount > 0 
                                 
-                                Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
-                                Behavior on opacity { NumberAnimation { duration: 150 } }
+                                Behavior on width {NumberAnimation { duration: 250; easing.type: Easing.OutQuart } }
+                                Behavior on opacity {enabled: !mainBarWindow.isGameMode; NumberAnimation { duration: 150 } }
                                 
                                 menuHandler: mainBarWindow.menuHandler
                             }

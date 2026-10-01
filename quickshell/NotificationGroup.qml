@@ -221,7 +221,7 @@ Item {
                                 let appName = groupItemDelegate.currentNotif.appName;
                                 if (appName) {
                                     let safeName = appName.replace(/ /g, '.*');
-                                    let cmd = `hyprctl dispatch focuswindow "class:(?i).*${safeName}.*" || hyprctl dispatch focuswindow "title:(?i).*${safeName}.*"`;
+                                    let cmd = `hyprctl dispatch "hl.dsp.focus({ window = 'class:(?i).*${safeName}.*' })" || hyprctl dispatch "hl.dsp.focus({ window = 'title:(?i).*${safeName}.*' })"`;
                                     Quickshell.execDetached({ command: ["bash", "-c", cmd] });
                                 }
 

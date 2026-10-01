@@ -15,10 +15,10 @@ Item {
     Settings {
         id: nlSettings
         category: "NightLight"
-        property int temperature: 4500
-        property bool scheduleEnabled: false
-        property string startTime: "20:00"
-        property string endTime: "07:00"
+        property int temperature
+        property bool scheduleEnabled
+        property string startTime 
+        property string endTime 
     }
 
     // Centralized command execution

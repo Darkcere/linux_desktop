@@ -47,7 +47,27 @@ ShellRoot {
         let active = Hyprland.activeToplevel;
         return active?.lastIpcObject?.fullscreen === 2;
     }
+    property bool isGameMode: false
 
+    onIsGameModeChanged: {
+        // Auto-toggle DND based on Game Mode state
+        NotificationManager.silent = isGameMode;
+        
+        if (isGameMode) {
+            // Close any open menus
+            if (dropdownLoader.item) dropdownLoader.item.closeRequested();
+            // Force memory cleanup to reclaim RAM immediately
+            gc(); 
+        }
+    }
+
+    IpcHandler {
+        target: "gamemode"
+        
+        function set(state: bool): void {
+            root.isGameMode = state;
+        }
+    }
     property var activeScreen: {
         let focusName = Hyprland.focusedMonitor?.name;
         let screen = Quickshell.screens.find(s => s.name === focusName);
@@ -162,59 +182,87 @@ ShellRoot {
     GlobalShortcut { name: "lockScreen"; onPressed: myLockScreen.isLocked = true }
     
 
-    Loader {
-        active: root.isBarActive && !root.realFullscreen
-        sourceComponent: Component {
+    Variants {
+        // Removed !root.isGameMode so the bar stays active
+        model: (root.isBarActive && !root.realFullscreen && root.activeScreen) ? [root.activeScreen] : []
+        
+        delegate: Component {
             Bar {
-                screen: root.activeScreen
+                screen: modelData
                 menuHandler: dropdownLoader.item 
                 isDropdownOpen: dropdownLoader.item?.isOpen ?? false
                 dropdownWidth: dropdownLoader.item?.currentDropWidth ?? 0
                 onToggleLauncherRequested: dropdownLoader.item?.toggleApps()
                 onToggleDashboardRequested: dropdownLoader.item?.toggleDashboard()
                 onTogglePowerRequested: dropdownLoader.item?.togglePowerMenu()
+                isGameMode: root.isGameMode
             }
         }
     }
     
-    LazyLoader {
-        id: popupsLoader
-        loading: true
-        NotificationPopup {
-            id: popups
-            
-            // 💡 THE FIX: Feed the unfocused screen to your new targetScreen property
-            targetScreen: (!root.realFullscreen) ? root.activeScreen : root.inactiveScreen
-            
-            isBarVisible: !root.realFullscreen && root.isBarActive && !dropdownLoader.item?.isOpen
-            dropdownOffset: root.isRightMenuOpen ? ((dropdownLoader.item?.currentDropHeight ?? 0) + 10) : 0
-        }
-    }
-    
-    LazyLoader {
-        id: dropdownLoader
-        loading: true 
-        DropdownWindow {
-            screen: root.activeScreen
-            isBarVisible: !root.realFullscreen && root.isBarActive
-        }
-    }
-    
+    // 💡 THE FIX: Use standard Loader to force full recreation of the popup window
+    // when monitors connect/disconnect to prevent Wayland surface detachment.
     Loader {
-        id: osdloader
-        // 'active' natively destroys the component from memory when false
-        active: shellSettings.enableOsd 
+        id: popupsLoader
+        
+        property var trackedScreen: root.activeScreen
+        onTrackedScreenChanged: {
+            // Toggle active to destroy and recreate the Component
+            active = false;
+            active = true;
+        }
+
+        active: trackedScreen !== null
         
         sourceComponent: Component {
-            Osd {
-                screen: root.activeScreen
+            NotificationPopup {
+                targetScreen: (!root.realFullscreen) ? root.activeScreen : root.inactiveScreen
+                isBarVisible: !root.realFullscreen && root.isBarActive && !dropdownLoader.item?.isOpen
+                dropdownOffset: root.isRightMenuOpen ? ((dropdownLoader.item?.currentDropHeight ?? 0) + 10) : 0
             }
         }
     }
+    
+    // 💡 THE FIX: Safely recreate the DropdownWindow on screen changes
+    // instead of dynamically reassigning a new screen to an existing Wayland window.
+    Loader {
+        id: dropdownLoader
+        
+        property var trackedScreen: root.activeScreen
+        onTrackedScreenChanged: {
+            active = false;
+            active = true;
+        }
+
+        active: trackedScreen !== null
+        
+        sourceComponent: Component {
+            DropdownWindow {
+                screen: dropdownLoader.trackedScreen
+                isBarVisible: !root.realFullscreen && root.isBarActive
+                isGameMode: root.isGameMode
+            }
+        }
+    }
+    
+
+    Variants {
+        // Dynamically creates and destroys the OSD whenever the active monitor 
+        // disconnects, reconnects, or changes.
+        model: root.activeScreen ? [root.activeScreen] : []
+        
+        delegate: Component {
+            Osd {
+                // Pass the screen from the model, not root.activeScreen directly
+                screen: modelData
+            }
+        }
+    }
+ 
 
     Instantiator {
         id: wallpaperInstantiator
-        model: Quickshell.screens
+        model: root.isGameMode ? [] : Quickshell.screens
         delegate: LazyLoader {
             loading: !root.realFullscreen
             

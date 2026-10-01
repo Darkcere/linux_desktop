@@ -7,11 +7,13 @@ import Quickshell.Services.Pipewire
 Item {
     id: root
     property bool isOpen: false
+    
     signal closeRequested()
     Shortcut {
         sequence: "Escape"
         onActivated: root.closeRequested()
     }
+    
     // --- CUSTOM STYLED SLIDER WITH BREATHING ANIMATION & HOVER EFFECTS ---
     component VolumeSlider: Slider {
         id: control
@@ -36,34 +38,19 @@ Item {
                 height: parent.height
                 color: Colors.workspaceactive 
                 radius: 3
-                
-                // --- BREATHING GLOW ANIMATION ---
-                Rectangle {
-                    id: glowRect
-                    anchors.fill: parent
-                    radius: 3
-                    color: Colors.text 
-                    opacity: 0
-                    
-                    states: State {
-                        name: "playing"; when: control.isPlaying
-                    }
-                    
-                    transitions: [
-                        Transition {
-                            from: "*"; to: "playing"
-                            SequentialAnimation {
-                                loops: Animation.Infinite
-                                NumberAnimation { target: glowRect; property: "opacity"; from: 0.0; to: 0.4; duration: 800; easing.type: Easing.InOutSine }
-                                NumberAnimation { target: glowRect; property: "opacity"; from: 0.4; to: 0.0; duration: 800; easing.type: Easing.InOutSine }
-                            }
-                        },
-                        Transition {
-                            from: "playing"; to: "*"
-                            NumberAnimation { target: glowRect; property: "opacity"; to: 0.0; duration: 300 }
-                        }
-                    ]
-                }
+            }
+            
+            // 💡 UPDATED: 100% Marker Line - Hover and Click behaviors added
+            Rectangle {
+                x: (1.0 / control.to) * parent.width - (width / 2)
+                y: -4
+                z: 5 // Makes sure it sits above the track
+                width: 4
+                height: parent.height + 8
+                color: Colors.workspaceempty // Changed color requested
+                opacity: 0.85
+                visible: control.to > 1.0 
+                radius: 2
             }
         }
         
@@ -73,7 +60,7 @@ Item {
             implicitWidth: 14
             implicitHeight: 14
             radius: 7
-            color: control.pressed ? Colors.workspaceurgent 
+            color: control.pressed ? Colors.workspaceactive 
                                    : (control.hovered ? Colors.workspaceactive : Colors.text)
             scale: (control.hovered || control.pressed) ? 1.25 : 1.0
             
@@ -162,8 +149,7 @@ Item {
                     radius: 3
                     color: vbar.pressed ? Colors.workspaceurgent : (vbar.hovered ? Colors.workspaceactive : Colors.secondary)
                     opacity: vbar.active ? 1.0 : 0.5
-                    Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutSine } }
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    
                 }
                 background: Rectangle { implicitWidth: 6; color: "transparent" }
             }
@@ -232,7 +218,9 @@ Item {
                             
                             VolumeSlider {
                                 width: parent.width - 75 
-                                anchors.verticalCenter: parent.verticalCenter // 💡 ADDED THIS LINE
+                                anchors.verticalCenter: parent.verticalCenter 
+                                to: 1.5 // 150% maximum limit for apps
+                                
                                 value: pwAudio ? pwAudio.volume : 0
                                 isPlaying: valid && modelData.state === 3
                                 
@@ -244,7 +232,7 @@ Item {
                                     onWheel: (wheel) => { 
                                         if (pwAudio) { 
                                             let s = 0.05; 
-                                            pwAudio.volume = Math.max(0, Math.min(1, pwAudio.volume + (wheel.angleDelta.y > 0 ? s : -s))); 
+                                            pwAudio.volume = Math.max(0, Math.min(parent.to, pwAudio.volume + (wheel.angleDelta.y > 0 ? s : -s))); 
                                         } 
                                     } 
                                 }
@@ -253,14 +241,13 @@ Item {
                             Text { 
                                 width: 35
                                 text: Math.round((pwAudio ? pwAudio.volume : 0) * 100) + "%"
-                                color: Colors.text
+                                color: pwAudio.volume > 1.01 ? Colors.workspaceurgent : Colors.text
                                 font.pixelSize: 14
                                 horizontalAlignment: Text.AlignRight
                                 anchors.verticalCenter: parent.verticalCenter // Centered
                             }
                         }
                         
-                        Item { width: 1; height: 6 }
                     }
                 }
             }

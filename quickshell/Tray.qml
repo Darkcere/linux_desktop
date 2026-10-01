@@ -10,7 +10,7 @@ Item {
     implicitHeight: 24
     readonly property int itemCount: trayRepeater.count
     required property var menuHandler
-
+    property bool traytooltip: true
     property Item hoveredItem: null
     property string hoveredTitle: ""
 
@@ -111,7 +111,7 @@ Item {
     // --- 4. TOOLTIP ---
     BarToolTip {
         targetItem: trayContainerWrapper.hoveredItem || trayContainerWrapper
-        active: trayContainerWrapper.hoveredItem !== null
+        active: trayContainerWrapper.hoveredItem !== null && traytooltip
         text: trayContainerWrapper.hoveredTitle
         topMargin: 22
     }

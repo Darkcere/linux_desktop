@@ -26,12 +26,6 @@ Text {
     color: Colors.text
     font.weight: 600
     font.pixelSize: 13
-    
-    // 💡 THE FIX: HoverHandler handles both the tooltip state AND the custom cursor natively!
-    HoverHandler { 
-        id: clockHover 
-        cursorShape: Qt.PointingHandCursor
-    }
 
     // 💡 THE FIX: TapHandler replaces MouseArea. It handles the click in C++ 
     // without creating a physical, invisible box in the Scene Graph!
@@ -39,16 +33,5 @@ Text {
         acceptedButtons: Qt.LeftButton 
         onTapped: root.showSeconds = !root.showSeconds
     }
-    Loader{
-        active: root.tooltip
-        sourceComponent: Component {
-            // --- THE ANIMATED TOOLTIP ---
-            BarToolTip {
-                targetItem: root
-                active: clockHover.hovered
-                text: "Left Click to toggle seconds and date"
-                topMargin: 23
-            }
-        }
-    }
+
 }

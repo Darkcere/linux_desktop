@@ -13,7 +13,7 @@ Item {
         sequence: "Escape"
         onActivated: root.closeRequested()
     }
-    // 💡 RESTORED: Auto width and height based on the dynamic layout!
+
     implicitWidth: menuLayout.implicitWidth 
     implicitHeight: menuLayout.implicitHeight + 12
 
@@ -22,7 +22,6 @@ Item {
         menu: menuRoot.activeItem ? menuRoot.activeItem.menu : null
     }
 
-    // 💡 RESTORED: ColumnLayout handles the max-width calculation natively
     ColumnLayout {
         id: menuLayout
         anchors.top: parent.top
@@ -61,17 +60,16 @@ Item {
                     Layout.fillWidth: true
                     implicitHeight: 24
                     
-                    // 💡 RESTORED: Dynamically sizes based on the text width!
                     implicitWidth: Math.max(160, mainText.contentWidth + 40)
                     
                     color: itemMouseArea.containsMouse ? Colors.workspaceactive : "transparent"
                     radius: 3
 
-                    // Kept the primitive Item for the row to prevent the D-Bus CPU spikes
                     Item {
                         anchors.fill: parent
                         anchors.leftMargin: 8
                         anchors.rightMargin: 8
+                        // Handles disabled (greyed out) state
                         opacity: (modelData.enabled !== undefined && !modelData.enabled) ? 0.5 : 1.0
 
                         Text {
@@ -79,7 +77,7 @@ Item {
                             text: "✓"
                             color: Colors.text
                             font.pixelSize: 11
-                            visible: modelData.checked || false
+                            visible: modelData.checkState > 0
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
                         }
@@ -89,8 +87,10 @@ Item {
                             text: topDelegate.cleanText
                             color: Colors.text
                             font.pixelSize: 11
-                            anchors.left: (modelData.checked || false) ? checkMark.right : parent.left
-                            anchors.leftMargin: (modelData.checked || false) ? 8 : 0
+                            // 💡 FIX: Fixed left margin so all text aligns vertically, 
+                            // whether the checkmark is visible or not.
+                            anchors.left: parent.left
+                            anchors.leftMargin: checkMark.visible ? 16 : 0
                             anchors.right: arrowMark.visible ? arrowMark.left : parent.right
                             anchors.rightMargin: arrowMark.visible ? 8 : 0
                             anchors.verticalCenter: parent.verticalCenter
@@ -112,6 +112,7 @@ Item {
                         id: itemMouseArea
                         anchors.fill: parent
                         hoverEnabled: true
+                        // Disables clicks if item is disabled
                         enabled: modelData.enabled !== undefined ? modelData.enabled : true
 
                         onClicked: {
@@ -145,6 +146,7 @@ Item {
                             model: subMenuOpener.children ? subMenuOpener.children.values : []
 
                             delegate: ColumnLayout {
+                                id: subDelegate // 💡 Added ID for safer scope references
                                 required property var modelData
                                 Layout.fillWidth: true
                                 spacing: 2
@@ -164,30 +166,52 @@ Item {
                                     visible: !modelData.isSeparator
                                     Layout.fillWidth: true
                                     implicitHeight: 24
-                                    
-                                    // 💡 RESTORED: Dynamic submenu sizing
                                     implicitWidth: Math.max(160, subMenuText.contentWidth + 40)
-                                    
                                     color: subItemMouseArea.containsMouse ? Colors.workspaceactive : "transparent"
                                     radius: 3
+                                    
+                                    // 💡 FIX: Apply disabled opacity to submenu items
+                                    opacity: (modelData.enabled !== undefined && !modelData.enabled) ? 0.5 : 1.0
 
-                                    Text {
-                                        id: subMenuText
-                                        anchors.left: parent.left
-                                        anchors.leftMargin: 20
-                                        anchors.right: parent.right
+                                    // 💡 FIX: Added Item wrapper to structure submenu checkmarks exactly like the main menu
+                                    Item {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 8
                                         anchors.rightMargin: 8
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        text: parent.parent.cleanText 
-                                        color: Colors.text
-                                        font.pixelSize: 11
-                                        elide: Text.ElideRight
+
+                                        Text {
+                                            id: subCheckMark
+                                            text: "✓"
+                                            color: Colors.text
+                                            font.pixelSize: 11
+                                            
+                                            // 💡 FIX: Same here, use checkState!
+                                            visible: modelData.checkState > 0 
+                                            
+                                            anchors.left: parent.left
+                                            anchors.verticalCenter: parent.verticalCenter
+                                        }
+
+                                        Text {
+                                            id: subMenuText
+                                            anchors.left: parent.left
+                                            anchors.leftMargin: subCheckMark.visible ? 16 : 0
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: subDelegate.cleanText // 💡 Safer reference using the delegate's ID
+                                            color: Colors.text
+                                            font.pixelSize: 11
+                                            elide: Text.ElideRight
+                                        }
                                     }
 
                                     MouseArea {
                                         id: subItemMouseArea
                                         anchors.fill: parent
                                         hoverEnabled: true
+                                        // 💡 FIX: Actually block clicks in the submenu if the item is disabled
+                                        enabled: modelData.enabled !== undefined ? modelData.enabled : true
+                                        
                                         onClicked: {
                                             if (modelData.triggered) modelData.triggered();
                                             else if (modelData.activate) modelData.activate();

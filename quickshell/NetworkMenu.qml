@@ -285,30 +285,7 @@ Rectangle {
                         Layout.fillWidth: true
                     }
                     
-                    Rectangle {
-                        width: 28; height: 28; radius: 14
-                        color: "transparent"
-                        
-                        Text { 
-                            id: vpnRefreshIcon
-                            anchors.centerIn: parent
-                            text: "󰑐" 
-                            color: fetchVpnsProcess.running ? Colors.workspaceactive : Colors.text
-                            font.pixelSize: 16 
-                            
-                            RotationAnimation on rotation {
-                                loops: Animation.Infinite
-                                from: 0; to: 360; duration: 1000
-                                running: fetchVpnsProcess.running
-                                onRunningChanged: { if (!running) vpnRefreshIcon.rotation = 0; }
-                            }
-                        }
-                        
-                        MouseArea { 
-                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                            onClicked: { if (!fetchVpnsProcess.running) fetchVpnsProcess.running = true; }
-                        }
-                    }
+                    
                 }
 
                 // --- VPN CONTENT ---

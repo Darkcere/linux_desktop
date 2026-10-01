@@ -98,6 +98,7 @@ PanelWindow {
     Rectangle {
         id: visualBox
         width: parent.width
+        // Box snaps instantly to avoid lag, animations handle the visual drop
         height: hasNotifications ? popupListView.contentHeight + 10 + (popupWindow.isBarVisible ? 0 : 10) : 0
         opacity: hasNotifications ? 1 : 0
         color: Colors.background 
@@ -106,9 +107,10 @@ PanelWindow {
         radius: 12
         clip: true
         
-        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.InOutQuad } }
+        // Removed Behavior on height to completely eliminate layout thrashing lag
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
 
-        // Seamless Bridge
+        // Seamless Bridge (Reverted to perfectly mask top border)
         Rectangle {
             id: seamlessBridge
             visible: popupWindow.hasNotifications && popupWindow.isBarVisible && popupWindow.dropdownOffset === 0
@@ -130,26 +132,28 @@ PanelWindow {
             interactive: false 
             model: NotificationManager.popupList
             verticalLayoutDirection: ListView.BottomToTop
+            
             displaced: Transition {
-                ParallelAnimation {
-                    NumberAnimation { properties: "x,y"; duration: 200; easing.type: Easing.OutCubic }
-                }
+                NumberAnimation { properties: "y"; duration: 200; easing.type: Easing.OutQuart }
             }
+            
+            // Fast slide-down effect on the items instead of animating the box
             add: Transition {
                 ParallelAnimation {
-                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 200; easing.type: Easing.OutCubic }
-                    NumberAnimation { property: "scale"; from: 0.95; to: 1.0; duration: 200; easing.type: Easing.OutCubic }
-                    NumberAnimation { property: "y"; duration: 200; easing.type: Easing.OutCubic }
+                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 200 }
+                    NumberAnimation { property: "y"; from: -20; duration: 250; easing.type: Easing.OutQuart }
                 }
             }
+            
             remove: Transition {
                 ParallelAnimation {
                     NumberAnimation { property: "opacity"; to: 0; duration: 150 }
-                    NumberAnimation { property: "scale"; to: 0.90; duration: 150 }
+                    NumberAnimation { property: "scale"; to: 0.95; duration: 150 }
                 }
             }
 
             delegate: Item {
+                
                 id: notifDelegate
                 width: ListView.view.width
                 height: contentCol.height + 20 
@@ -200,7 +204,7 @@ PanelWindow {
                             let appName = notifDelegate.currentNotif.appName;
                             if (appName) {
                                 let safeName = appName.replace(/ /g, '.*');
-                                let cmd = `hyprctl dispatch focuswindow "class:(?i).*${safeName}.*" || hyprctl dispatch focuswindow "title:(?i).*${safeName}.*"`;
+                                let cmd = `hyprctl dispatch "hl.dsp.focus({ window = 'class:(?i).*${safeName}.*' })" || hyprctl dispatch "hl.dsp.focus({ window = 'title:(?i).*${safeName}.*' })"`;
                                 Quickshell.execDetached({ command: ["bash", "-c", cmd] });
                             }
 

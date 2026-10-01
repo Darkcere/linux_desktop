@@ -346,7 +346,6 @@ Item {
             spacing: 5
 
             opacity: searchInput.text.startsWith(launcherWindow.actionPrefix) ? 0.3 : 1.0
-            Behavior on opacity { NumberAnimation { duration: 150 } }
 
             delegate: Item {
                 width: appsList.width

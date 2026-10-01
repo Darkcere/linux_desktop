@@ -11,14 +11,14 @@ PanelWindow {
     property bool isBarVisible: false
     property var currentTrayItem: null
     property string pendingAppSearch: ""
-
+    property bool isGameMode: false
     // 💡 THE LOCK: True whenever Polkit is actively prompting
     property bool isPolkitLocked: root.activeView === "polkit"
 
     // ⚡ O(1) DYNAMIC MORPHING DIMENSIONS (Massive performance boost over dictionary objects)
     function getDropWidth(view) {
-        if (view === "tray") return trayMenuView.item ? trayMenuView.item.implicitWidth : 600; 
         switch(view) {
+            case "tray": return trayMenuView.item ? trayMenuView.item.implicitWidth : 600; 
             case "dashboard": return 1080;
             case "wallpaper":
             case "clipboard": return 950;
@@ -32,8 +32,8 @@ PanelWindow {
     }
 
     function getDropHeight(view) {
-        if (view === "tray") return trayMenuView.item ? trayMenuView.item.implicitHeight : 450; 
         switch(view) {
+            case "tray": return trayMenuView.item ? trayMenuView.item.implicitHeight : 450; 
             case "dashboard": return 400;
             case "wallpaper": return 500;
             case "tools": return 570;
@@ -48,7 +48,7 @@ PanelWindow {
     property int currentDropWidth: getDropWidth(lastActiveView)
     property int currentDropHeight: getDropHeight(lastActiveView)
     property bool isRightAligned: lastActiveView === "tray" || lastActiveView === "audio" || lastActiveView === "notifications"
-    property int morphSpeed: 350
+    property int morphSpeed: isGameMode ? 0 : 350
     onActiveViewChanged: {
         if (activeView !== "") {
             lastActiveView = activeView
@@ -160,13 +160,13 @@ PanelWindow {
         
         anchors.horizontalCenter: root.isRightAligned ? undefined : parent.horizontalCenter
         anchors.right: root.isRightAligned ? parent.right : undefined
-        anchors.rightMargin: root.isRightAligned ? 7 : 0 
+        anchors.rightMargin: root.isRightAligned ? 8 : 0 
         transformOrigin: root.isRightAligned ? Item.TopRight : Item.Top
 
         color: Colors.background 
         border.color: Colors.border
-        border.width: 2
-        radius: 12
+        border.width: isGameMode ? 1 : 2
+        radius: isGameMode ? 0 : 12
         
         width: root.isOpen ? root.currentDropWidth : (parent.width - 14)
         height: root.isOpen ? root.currentDropHeight : 0
@@ -190,8 +190,8 @@ PanelWindow {
             x: 0; y: -5; width: parent.width; height: 17 
             color: Colors.background
             
-            Rectangle { anchors.left: parent.left; width: 2; height: parent.height; color: Colors.border }
-            Rectangle { anchors.right: parent.right; width: 2; height: parent.height; color: Colors.border }
+            Rectangle { anchors.left: parent.left; width: isGameMode ? 1 : 2; height: parent.height; color: Colors.border }
+            Rectangle { anchors.right: parent.right; width: isGameMode ? 1 : 2; height: parent.height; color: Colors.border }
         }
 
         Item {
