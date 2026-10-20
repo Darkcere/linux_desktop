@@ -113,13 +113,12 @@ Item {
         wallpaperSettings.cachedActive = targetPath; // 💡 Update the cache!
         pickerWindow.wallpaperSelected(targetPath);
         
-        let bashCmd = `
-            echo "${targetPath}" > "$HOME/.current_wall_path"
-            ln -sf "${targetPath}" "$HOME/.current.wall"
-            qs ipc call wallpaper update
-        `;
-        
-        Quickshell.execDetached({ command: ["bash", "-c", bashCmd] });
+        const home = Quickshell.env("HOME");
+        Quickshell.execDetached({ command: ["ln", "-sf", targetPath, home + "/.current.wall"] });
+        Quickshell.execDetached({
+            command: ["sh", "-c", "printf '%s' \"$1\" > \"$HOME/.current_wall_path\"", "quickshell", targetPath]
+        });
+        Quickshell.execDetached({ command: ["qs", "ipc", "call", "wallpaper", "update"] });
         pickerWindow.closeRequested();
         
         if (entry.rawPath === "random_trigger") {

@@ -22,6 +22,8 @@ Item {
         onActivated: root.closeRequested()
     }
 
+    property bool enableBluetooth: SettingsService.enableBluetooth
+    property bool enableNotifications: SettingsService.enableNotifications
     // Live metrics properties
     property real cpuUsage: 0
     property real ramUsage: 0
@@ -32,7 +34,7 @@ Item {
     // 💡 Optimized Single Poll Timer (Queries CPU, RAM, Disk, and GPU all at once)
     Timer {
         interval: 2500
-        running: root.isOpen
+        running: root.isOpen && SettingsService.enableSystemStats
         repeat: true
         triggeredOnStart: true
         onTriggered: {
@@ -157,6 +159,7 @@ Item {
         // --- COLUMN 2: MEDIA PLAYER ---
         Rectangle {
             id: mediaCard
+            visible: SettingsService.enableMedia
             Layout.preferredWidth: 240
             Layout.fillHeight: true
             color: "transparent"
@@ -232,7 +235,7 @@ Item {
             Timer {
                 id: mediaTimer
                 interval: 250
-                running: root.isOpen && mediaCard.player !== null
+                running: root.isOpen && SettingsService.enableMedia && mediaCard.player !== null
                 repeat: true
                 triggeredOnStart: true
                 
@@ -479,6 +482,7 @@ Item {
 
             RowLayout {
                 id: quickSettings
+                visible: SettingsService.enableQuickSettings
                 Layout.fillWidth: true
                 Layout.preferredHeight: 46 
                 Layout.maximumHeight: 46
@@ -505,7 +509,7 @@ Item {
                 property bool isActive: hasWifi ? wifiOn : netOn
 
                 // 💡 Network / Wi-Fi Toggle with Split Button & Arrow
-                Rectangle { 
+                Rectangle {
                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 12
                     color: quickSettings.isActive ? Colors.workspaceactive : "transparent"
                     border.color: quickSettings.isActive ? "transparent" : Colors.border; 
@@ -590,7 +594,8 @@ Item {
                 }
 
                 // 💡 Bluetooth Toggle with Split Button & Arrow
-                Rectangle { 
+                Rectangle {
+                    enabled: SettingsService.enableBluetooth
                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 12
                     color: quickSettings.btOn ? Colors.workspaceactive : "transparent"
                     border.color: quickSettings.btOn ? "transparent" : Colors.border; border.width: quickSettings.btOn ? 0 : 2
@@ -763,8 +768,8 @@ Item {
             Loader {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                active: !root.showBluetoothMenu && !root.showNetworkMenu && !root.showNightLightMenu
-                visible: status === Loader.Ready
+                active: SettingsService.enableDashboardCalendar && !root.showBluetoothMenu && !root.showNetworkMenu && !root.showNightLightMenu
+                visible: SettingsService.enableDashboardCalendar && status === Loader.Ready
                 
                 sourceComponent: Component {
                     DashboardCalendar {}
@@ -774,7 +779,7 @@ Item {
             Loader {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                active: root.showBluetoothMenu
+                active: root.showBluetoothMenu && root.enableBluetooth
                 visible: status === Loader.Ready
                 
                 sourceComponent: Component {
@@ -817,6 +822,7 @@ Item {
             spacing: 15
 
             Rectangle {
+                visible: SettingsService.enableSystemStats
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 color: "transparent"
@@ -911,11 +917,23 @@ Item {
                     command: ["python3", "-c", "
 with open('/proc/net/dev', 'r') as f:
     for line in f:
-        if 'eth0:' in line:
-            parts = line.split()
-            print(parts[1], parts[9])
+        if ':' not in line:
+            continue
+        name, values = line.split(':', 1)
+        name = name.strip()
+        if name == 'lo' or name.startswith(('docker', 'veth', 'br-')):
+            continue
+        try:
+            with open('/sys/class/net/' + name + '/operstate') as state:
+                if state.read().strip() != 'up':
+                    continue
+        except OSError:
+            continue
+        parts = values.split()
+        if len(parts) >= 9:
+            print(parts[0], parts[8])
             break
-"]
+"] 
                     stdout: StdioCollector {
                         onStreamFinished: {
                             let parts = text.trim().split(/\s+/);
@@ -952,7 +970,7 @@ with open('/proc/net/dev', 'r') as f:
 
                 Timer {
                     interval: 1000
-                    running: root.isOpen
+                    running: root.isOpen && SettingsService.enableNetworkMonitor
                     repeat: true
                     triggeredOnStart: true
                     onTriggered: {
@@ -1088,6 +1106,7 @@ with open('/proc/net/dev', 'r') as f:
                             onMoved: {
                                 let val = Math.round(value);
                                 setBrightness.command = ["ddcutil", "-b", "7", "--noverify", "setvcp", "10", val.toString()];
+                                setBrightness.running = true;
                             }
 
                             MouseArea {
@@ -1097,6 +1116,7 @@ with open('/proc/net/dev', 'r') as f:
                                     let delta = wheel.angleDelta.y > 0 ? 5 : -5;
                                     bSlider.value = Math.min(100, Math.max(0, bSlider.value + delta));
                                     setBrightness.command = ["ddcutil", "-b", "7", "--noverify", "setvcp", "10", Math.round(bSlider.value).toString()];
+                                    setBrightness.running = true;
                                     wheel.accepted = true;
                                 }
                             }
@@ -1354,6 +1374,5 @@ except Exception:
 
     Process {
         id: setBrightness
-        running: command.length > 0
     }
 }

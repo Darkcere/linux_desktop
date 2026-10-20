@@ -5,6 +5,7 @@ import "AudioService.qml"
 
 PanelWindow {
     id: osdWindow
+    property var modelData
     mask: Region { }
     WlrLayershell.layer: WlrLayer.Overlay
     exclusionMode: ExclusionMode.Ignore

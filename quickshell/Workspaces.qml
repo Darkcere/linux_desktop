@@ -31,7 +31,7 @@ Row {
             id: innerRow
             anchors.centerIn: parent
             spacing: 3
-
+            
             // Always show workspaces 1-5
             Repeater {
                 model: 5
@@ -56,7 +56,7 @@ Row {
                         if (isEmpty) return Colors.workspaceempty;
                         return Colors.workspace;
                     }
-
+                    
                     Behavior on color {enabled: !isGameMode; ColorAnimation { duration: 300 } }
                     Behavior on width {enabled: !isGameMode; NumberAnimation { duration: 200 } }
 
@@ -102,8 +102,8 @@ Row {
                         anchors.fill: parent
                         hoverEnabled: true 
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = '" + wsId + "' })")
-                        
+                        // Fix: change wsId to ws.id
+                        onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = '" + ws.id + "' })")
                     }
                 }
             }

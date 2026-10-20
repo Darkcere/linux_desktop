@@ -24,7 +24,7 @@ PanelWindow {
     
     margins { 
         top: dropdownOffset 
-        right: 7 
+        right: 8 
     }
 
     Behavior on margins.top { NumberAnimation { duration: 300; easing.type: Easing.OutQuart } }
@@ -201,12 +201,7 @@ PanelWindow {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            let appName = notifDelegate.currentNotif.appName;
-                            if (appName) {
-                                let safeName = appName.replace(/ /g, '.*');
-                                let cmd = `hyprctl dispatch "hl.dsp.focus({ window = 'class:(?i).*${safeName}.*' })" || hyprctl dispatch "hl.dsp.focus({ window = 'title:(?i).*${safeName}.*' })"`;
-                                Quickshell.execDetached({ command: ["bash", "-c", cmd] });
-                            }
+                            NotificationManager.focusNotificationApp(notifDelegate.currentNotif.appName);
 
                             if (notifDelegate.defaultAction) {
                                 NotificationManager.attemptInvokeAction(notifDelegate.currentNotif.id, notifDelegate.defaultAction.identifier);
@@ -380,9 +375,7 @@ PanelWindow {
 
                                 onAccepted: {
                                     if (text.trim() !== "") {
-                                        let safeText = text.replace(/"/g, '\\"');
-                                        let dbusCmd = `dbus-send --session --type=signal / org.freedesktop.Notifications.NotificationReplied uint32:${notifDelegate.currentNotif.id} string:"${safeText}"`;
-                                        Quickshell.execDetached({ command: ["bash", "-c", dbusCmd] });
+                                        NotificationManager.sendInlineReply(notifDelegate.currentNotif.id, text);
                                         replyInput.text = "";
                                         NotificationManager.discardNotification(notifDelegate.currentNotif.id);
                                     }

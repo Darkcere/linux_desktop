@@ -4,8 +4,31 @@ import Quickshell.Wayland
 import QtQuick
 import Quickshell.Io
 import QtCore
+import Quickshell.Services.Polkit
 ShellRoot {
     id: root
+    PolkitAgent {
+        id: globalPolkitAgent
+
+        onIsActiveChanged: {
+            if (isActive && dropdownLoader.item) {
+                dropdownLoader.item.openPolkit()
+            } else if (!isActive && dropdownLoader.item) {
+                dropdownLoader.item.closePolkit()
+            }
+        }
+    }
+    property var lockedScreen: null
+    Connections {
+        target: globalPolkitAgent
+        function onIsActiveChanged() {
+            if (globalPolkitAgent && globalPolkitAgent.isActive) {
+                root.lockedScreen = root.activeScreen;
+            } else {
+                root.lockedScreen = null;
+            }
+        }
+    }
     property var _initNightLight: NightLightService
     Connections {
         target: Quickshell
@@ -22,8 +45,6 @@ ShellRoot {
     
     property bool isScreenLocked: false
 
-    // 💡 THE FIX: Moved the lock listener to the main shell and throttled it to 250ms
-    // to massively reduce idle CPU usage while remaining responsive.
     Timer {
         interval: 250
         running: !root.isScreenLocked
@@ -40,6 +61,7 @@ ShellRoot {
             }
         }
     }
+    
     property bool realFullscreen: {
         let workspaceHasFs = Hyprland.focusedWorkspace?.hasFullscreen ?? false;
         if (!workspaceHasFs) return false;
@@ -47,39 +69,37 @@ ShellRoot {
         let active = Hyprland.activeToplevel;
         return active?.lastIpcObject?.fullscreen === 2;
     }
+    
     property bool isGameMode: false
 
     onIsGameModeChanged: {
-        // Auto-toggle DND based on Game Mode state
         NotificationManager.silent = isGameMode;
-        
         if (isGameMode) {
-            // Close any open menus
             if (dropdownLoader.item) dropdownLoader.item.closeRequested();
-            // Force memory cleanup to reclaim RAM immediately
             gc(); 
         }
     }
 
     IpcHandler {
         target: "gamemode"
-        
         function set(state: bool): void {
             root.isGameMode = state;
         }
     }
+    
     property var activeScreen: {
+        // Freeze screen tracking if Polkit is currently open
+        if (root.lockedScreen) return root.lockedScreen;
+
         let focusName = Hyprland.focusedMonitor?.name;
         let screen = Quickshell.screens.find(s => s.name === focusName);
         return screen || (Quickshell.screens.length > 0 ? Quickshell.screens[0] : null);
     }
 
-    // 💡 THE FIX: Track the unfocused screen
     property var inactiveScreen: {
-        let focusName = Hyprland.focusedMonitor?.name;
-        // Find the first screen that does NOT match the currently focused monitor
-        let screen = Quickshell.screens.find(s => s.name !== focusName);
-        // If only one monitor is connected, safely fallback to the active screen
+        // Derive inactive screen relative to current activeScreen rather than raw focus
+        let activeName = root.activeScreen?.name;
+        let screen = Quickshell.screens.find(s => s.name !== activeName);
         return screen || root.activeScreen;
     }
 
@@ -95,95 +115,42 @@ ShellRoot {
         let colorCmd = `matugen --source-color-index 0 image "$HOME/.current.wall" -t scheme-content && sh "$HOME/.config/hypr/scripts/colors_mqtt.sh"`;
         Quickshell.execDetached({ command: ["bash", "-c", colorCmd] });
     }
-    // 💡 THE FIX: Use Quickshell's native PersistentProperties with JSON IO
-    PersistentProperties {
-        id: shellSettings
-        
-        // 1. Define your properties (with default values)
-        property bool enableBar: true
-        property bool enableOsd: true
-        
-        // Internal flag to prevent saving while we are initially loading
-        property bool _isLoaded: false
-
-        // 2. Load from JSON on startup
-        Component.onCompleted: {
-            try {
-                let xhr = new XMLHttpRequest();
-                let path = Quickshell.env("HOME") + "/.config/quickshell/shell_settings.json";
-                xhr.open("GET", "file://" + path, false);
-                xhr.send();
-                
-                if (xhr.status === 200 || xhr.status === 0) {
-                    let data = JSON.parse(xhr.responseText);
-                    if (data.enableBar !== undefined) enableBar = data.enableBar;
-                    if (data.enableOsd !== undefined) enableOsd = data.enableOsd;
-                }
-            } catch(e) {
-                console.log("No existing config found, starting with defaults.");
-            }
-            _isLoaded = true; // Safe to save now
-        }
-
-        // 3. Trigger a save whenever a property changes
-        onEnableBarChanged: if (_isLoaded) save()
-        onEnableOsdChanged: if (_isLoaded) save()
-
-        // 4. Save to JSON
-        function save() {
-            let data = {
-                enableBar: enableBar,
-                enableOsd: enableOsd
-            }
-            
-            // Convert to string and safely escape it for bash
-            let jsonStr = JSON.stringify(data, null, 2).replace(/'/g, "'\\''");
-            let cmd = `mkdir -p "$HOME/.config/quickshell" && echo '${jsonStr}' > "$HOME/.config/quickshell/shell_settings.json"`;
-            
-            Quickshell.execDetached({ command: ["bash", "-c", cmd] });
-        }
-    }
-    property bool isBarActive: shellSettings.enableBar
     
-    // Toggle the window with a shortcut
-    GlobalShortcut { 
-        name: "toggleDashboard"
-        onPressed: dropdownLoader.item?.toggleDashboard() 
-    }
+    property bool isBarActive: SettingsService.enableBar
     
+    GlobalShortcut { name: "toggleDashboard"; onPressed: dropdownLoader.item?.toggleDashboard() }
     GlobalShortcut { name: "toggleTools"; onPressed: dropdownLoader.item?.toggleTools() }
+    GlobalShortcut { name: "toggleSettings"; onPressed: dropdownLoader.item?.toggleSettings() }
     GlobalShortcut { name: "togglePowerMenu"; onPressed: dropdownLoader.item?.togglePowerMenu() }
     GlobalShortcut { name: "toggleClipboard"; onPressed: dropdownLoader.item?.toggleClipboard() }
     GlobalShortcut { name: "toggleLauncher"; onPressed: dropdownLoader.item?.toggleApps() }
     GlobalShortcut { name: "toggleWallpaperPicker"; onPressed: dropdownLoader.item?.openWallpaperPicker() }
     GlobalShortcut { name: "toggleAudioMenu"; onPressed: dropdownLoader.item?.toggleAudio() }
     GlobalShortcut { name: "toggleNotifications"; onPressed: dropdownLoader.item?.toggleNotifications() }
+    GlobalShortcut { name: "toggleBar"; onPressed: SettingsService.enableBar = !SettingsService.enableBar }
     
-    GlobalShortcut { name: "toggleBar"; onPressed: root.isBarActive = !root.isBarActive }
     IpcHandler {
         target: "wallpaper"
-
         function update(): void {
             root.applySystemColors();
             root.wallpaperToken = Date.now().toString();
         }
     }
+    
     Loader {
         id: lockScreenLoader
         active: root.isScreenLocked
         sourceComponent: Component {
             LockScreen {
-                // Pass the locked state and listen for the cleanup signal
                 isLocked: root.isScreenLocked
                 onUnlocked: root.isScreenLocked = false
             }
         }
     }
-    GlobalShortcut { name: "lockScreen"; onPressed: myLockScreen.isLocked = true }
     
-
+    
+    // Main Bar (Only on the actively focused screen)
     Variants {
-        // Removed !root.isGameMode so the bar stays active
         model: (root.isBarActive && !root.realFullscreen && root.activeScreen) ? [root.activeScreen] : []
         
         delegate: Component {
@@ -199,21 +166,91 @@ ShellRoot {
             }
         }
     }
-    
-    // 💡 THE FIX: Use standard Loader to force full recreation of the popup window
-    // when monitors connect/disconnect to prevent Wayland surface detachment.
+    // Dynamic Island Notch with custom MediaPlayer component
+    PanelWindow {
+        // 💡 Target the specific unfocused screen object, not the whole array
+        screen: root.inactiveScreen
+        margins{
+            bottom: 3;
+        }
+        // Only show if the bar is active and we actually HAVE an inactive screen 
+        // (meaning you have at least 2 monitors connected).
+        visible: SettingsService.enableInactiveBar && root.inactiveScreen && (root.inactiveScreen.name !== Hyprland.focusedMonitor?.name)
+        
+        anchors { top: true; left: false; right: false; bottom: false } 
+        WlrLayershell.layer: WlrLayer.Top
+        
+        width: notchContainer.width
+        height: notchContainer.height
+        color: "transparent"
+
+        Item {
+            id: notchContainer
+            
+            property bool hasMedia: mediaLoader.status === Loader.Ready && mediaLoader.item && mediaLoader.item.visible
+            
+            width: hasMedia ? userClock.width + mediaLoader.width + 32 : userClock.width + 32
+            height: Math.max(32, userClock.height + 12, userClock.implicitHeight + 12)
+            clip: true 
+            
+            Behavior on width { NumberAnimation { duration: 50; easing.type: Easing.OutExpo } }
+
+            Rectangle {
+                width: parent.width
+                height: parent.height + radius
+                y: -radius 
+                
+                color: Colors.background
+                radius: 12
+            }
+            
+
+             Row{   
+                anchors.centerIn: parent
+                spacing: 6
+                Clock {
+                    id: userClock
+                    anchors.verticalCenter: parent.verticalCenter
+                    showSeconds: !notchContainer.hasMedia
+                }
+                
+                Loader {
+                    id: mediaLoader
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: root.realFullscreen && !root.isGameMode
+                    // 🚨 If you want the Media Player to ALSO stay visible during fullscreen, 
+                    // completely delete this "active" line below. 
+                    // Leaving it here means it shrinks to just the clock during fullscreen.
+                    active: root.realFullscreen && !root.isGameMode
+                    
+                    sourceComponent: Component {
+                        Mediaplayer {
+                            // internal Mediaplayer component
+                        }
+                    }
+                }
+             }
+        }
+    }
     Loader {
         id: popupsLoader
-        
         property var trackedScreen: root.activeScreen
-        onTrackedScreenChanged: {
-            // Toggle active to destroy and recreate the Component
-            active = false;
-            active = true;
+        
+        Timer {
+            id: popupsDebounce
+            interval: 150
+            onTriggered: {
+                if (popupsLoader.trackedScreen !== null) {
+                    popupsLoader.active = true;
+                }
+            }
         }
 
-        active: trackedScreen !== null
-        
+        onTrackedScreenChanged: {
+            active = false; 
+            popupsDebounce.restart(); 
+        }
+
         sourceComponent: Component {
             NotificationPopup {
                 targetScreen: (!root.realFullscreen) ? root.activeScreen : root.inactiveScreen
@@ -223,19 +260,25 @@ ShellRoot {
         }
     }
     
-    // 💡 THE FIX: Safely recreate the DropdownWindow on screen changes
-    // instead of dynamically reassigning a new screen to an existing Wayland window.
     Loader {
         id: dropdownLoader
-        
         property var trackedScreen: root.activeScreen
-        onTrackedScreenChanged: {
-            active = false;
-            active = true;
+        
+        Timer {
+            id: dropdownDebounce
+            interval: 150
+            onTriggered: {
+                if (dropdownLoader.trackedScreen !== null) {
+                    dropdownLoader.active = true;
+                }
+            }
         }
 
-        active: trackedScreen !== null
-        
+        onTrackedScreenChanged: {
+            active = false;
+            dropdownDebounce.restart();
+        }
+
         sourceComponent: Component {
             DropdownWindow {
                 screen: dropdownLoader.trackedScreen
@@ -245,24 +288,18 @@ ShellRoot {
         }
     }
     
-
     Variants {
-        // Dynamically creates and destroys the OSD whenever the active monitor 
-        // disconnects, reconnects, or changes.
-        model: root.activeScreen ? [root.activeScreen] : []
-        
+        model: SettingsService.enableOsd && root.activeScreen ? [root.activeScreen] : []
         delegate: Component {
             Osd {
-                // Pass the screen from the model, not root.activeScreen directly
                 screen: modelData
             }
         }
     }
  
-
     Instantiator {
         id: wallpaperInstantiator
-        model: root.isGameMode ? [] : Quickshell.screens
+        model: SettingsService.enableWallpaper && !root.isGameMode ? Quickshell.screens : []
         delegate: LazyLoader {
             loading: !root.realFullscreen
             

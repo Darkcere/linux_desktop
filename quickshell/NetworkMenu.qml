@@ -70,6 +70,13 @@ Rectangle {
         onTriggered: fetchVpnsProcess.running = true
     }
 
+    Timer {
+        id: vpnActionRefreshTimer
+        interval: 500
+        repeat: false
+        onTriggered: fetchVpnsProcess.running = true
+    }
+
     // --- SHARED PROCESSES ---
     Process { id: netActionProcess }
     Process { 
@@ -352,11 +359,7 @@ Rectangle {
                                                 netActionProcess.command = ["nmcli", "connection", "up", model.name];
                                             }
                                             netActionProcess.running = true;
-                                            
-                                            // Force a fast refresh to update the UI
-                                            Qt.callLater(() => {
-                                                let t = Qt.createQmlObject("import QtQml; Timer {interval: 500; running: true; onTriggered: fetchVpnsProcess.running = true}", netMenuRoot);
-                                            });
+                                            vpnActionRefreshTimer.restart();
                                         }
                                     }
                                 }

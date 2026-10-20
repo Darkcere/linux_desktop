@@ -14,7 +14,7 @@ Item {
     Process {
         id: cavaProc
         command: ["sh", "-c", "exec cava -p ~/.config/cava/quickshell.conf"]
-        running: true
+        running: SettingsService.enableVisualizer
         
         stdout: SplitParser {
             splitMarker: "\n"

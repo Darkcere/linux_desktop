@@ -8,6 +8,7 @@ Item {
     
     property bool isOpen: false
     signal closeRequested()
+    signal openSettingsRequested()
 
     property int selectedIndex: 0
     property string currentMenuId: "menu_main"
@@ -31,6 +32,7 @@ Item {
             { name: "Open Recordings", iconStr: "", action: "open_rec" },
             { name: "OCR", iconStr: "󰊄", action: "ocr" },
             { name: "Color Picker", iconStr: "", action: "menu_colorpicker" },
+            { name: "Feature Settings", iconStr: "", action: "settings" },
             { name: "Pomodoro", iconStr: "⏱", action: "pomodoro" }
         ],
         "menu_layouts": [
@@ -85,7 +87,10 @@ Item {
                 privacy="[VISIBLE]"
             fi
             
+            # Reverted to awk to guarantee it catches the correct value
             lay_ws=$(hyprctl activeworkspace | awk '/tiledLayout:/ {print $2}')
+            [[ -z "$lay_ws" ]] && lay_ws="None"
+
             lay_gen=$(hyprctl getoption general:layout -j | jq -r '.str')
             
             cat <<EOF
@@ -130,21 +135,26 @@ EOF
             return;
         }
 
+        if (action === "settings") {
+            toolsWindow.openSettingsRequested();
+            return;
+        }
+
         let cmd = "";
         
         switch (action) {
             case "gamemode": cmd = `bash ${scriptsDir}gamemode.sh &`; break;
-            case "privacy": cmd = `hyprctl dispatch setprop active no_screen_share toggle`; break;
+            case "privacy": cmd = `hyprctl dispatch 'hl.dsp.window.set_prop({ window = "active", prop = "no_screen_share", value = "toggle" })'`; break;
             case "screenrecord": cmd = `nohup bash ${scriptsDir}screenrecord.sh > /dev/null 2>&1 & disown`; break;
             case "open_rec": cmd = `xdg-open "\${XDG_VIDEOS_DIR:-$HOME/Videos}/Recordings" &`; break;
             case "ocr": cmd = `sleep 0.3; bash ${scriptsDir}ocr.sh &`; break;
             case "pomodoro": cmd = `nohup bash ${scriptsDir}pomodoro.sh > /dev/null 2>&1 & disown`; break;
             
-            case "lay_dwindle": cmd = `hyprctl keyword workspace "$(hyprctl -j activeworkspace | jq '.id')", layout:dwindle`; break;
-            case "lay_scrolling": cmd = `hyprctl keyword workspace "$(hyprctl -j activeworkspace | jq '.id')", layout:scrolling`; break;
-            case "lay_master": cmd = `hyprctl keyword workspace "$(hyprctl -j activeworkspace | jq '.id')", layout:master`; break;
-            case "lay_monocle": cmd = `hyprctl keyword workspace "$(hyprctl -j activeworkspace | jq '.id')", layout:monocle`; break;
-            case "lay_general": cmd = `hyprctl keyword general:layout "${toolsWindow.statLayoutWs}"`; break;
+            case "lay_dwindle": cmd = `ws=$(hyprctl activeworkspace -j | jq -r .id) && hyprctl eval "hl.workspace_rule({ workspace = '$ws', layout = 'dwindle' })"`; break;
+            case "lay_scrolling": cmd = `ws=$(hyprctl activeworkspace -j | jq -r .id) && hyprctl eval "hl.workspace_rule({ workspace = '$ws', layout = 'scrolling' })"`; break;
+            case "lay_master": cmd = `ws=$(hyprctl activeworkspace -j | jq -r .id) && hyprctl eval "hl.workspace_rule({ workspace = '$ws', layout = 'master' })"`; break;
+            case "lay_monocle": cmd = `ws=$(hyprctl activeworkspace -j | jq -r .id) && hyprctl eval "hl.workspace_rule({ workspace = '$ws', layout = 'monocle' })"`; break;
+            case "lay_general": cmd = `hyprctl eval "hl.config({ general = { layout = '${toolsWindow.statLayoutWs}' } })"`; break;
             
             case "ss_folder": cmd = `xdg-open "\${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots" &`; break;
             case "ss_region": cmd = `sleep 0.3; bash ${scriptsDir}screenshot.sh s &`; break;

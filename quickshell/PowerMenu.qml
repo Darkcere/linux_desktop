@@ -129,9 +129,6 @@ Item {
                     anchors.fill: parent
                     hoverEnabled: true
                     onClicked: powerWindow.executeSelected(index)
-                    
-                    // Allow mouse movement to update the keyboard selection state seamlessly
-                    onEntered: powerWindow.selectedIndex = index
                 }
             }
         }

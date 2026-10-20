@@ -130,7 +130,7 @@ Singleton {
     property bool silent: false
     property list<Notif> list: []
     property var popupList: list.filter(notif => notif.popup)
-    property bool popupInhibited: silent
+    property bool popupInhibited: silent || !SettingsService.enableNotificationPopups
     property var totalCounts: ({}) 
 
     Component { id: notifComponent; Notif {} }
@@ -150,6 +150,13 @@ Singleton {
         onTriggered: {
             const limitedList = limitNotificationsPerSummary(root.list);
             notifSettings.cachedJSON = stringifyList(limitedList);
+        }
+    }
+
+    Connections {
+        target: SettingsService
+        function onEnableNotificationPopupsChanged() {
+            if (!SettingsService.enableNotificationPopups) root.hideAllPopups();
         }
     }
 
@@ -176,10 +183,10 @@ Singleton {
             "replaceKey": json.replaceKey || "",
             "cachedAppIcon": json.cachedAppIcon || "",
             "cachedImage": json.cachedImage || "",
-            "isCached": json.isCached || true,
+            "isCached": json.isCached ?? false,
             "popup": false 
         });
-    }
+    } 
 
     function limitNotificationsPerSummary(notifications) {
         var groups = {};
@@ -284,6 +291,7 @@ Singleton {
         inlineReplySupported: true
         
         onNotification: notification => {
+            if (!SettingsService.enableNotifications) return;
             if (!notification || (!notification.summary && !notification.body)) return;
 
             notification.tracked = true;
@@ -295,7 +303,7 @@ Singleton {
 
             Qt.callLater(() => {
                 root.list = [...root.list, newNotifObject];
-                // saveNotifications(); if i want to persist server notifications on restart, uncomment this line. but for now, we don't want to persist them.
+                saveNotifications();
             });
 
             if (!root.popupInhibited) {
@@ -311,6 +319,7 @@ Singleton {
     }
 
     function notifyInternal(options) {
+        if (!SettingsService.enableNotifications) return null;
         if (!options || (!options.summary && !options.body)) return null;
 
         if (options.replaceKey) {
@@ -344,18 +353,51 @@ Singleton {
         }
 
         root.list = [...root.list, newNotifObject];
-        // saveNotifications(); if i want to persist server notifications on restart, uncomment this line. but for now, we don't want to persist them.
+        saveNotifications();
         root.notify(newNotifObject);
         return newNotifObject;
+    }
+
+    function focusNotificationApp(appName) {
+        if (!appName) return;
+
+        const safeName = appName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, ".*");
+        const focusCommand = "hl.dsp.focus({ window = 'class:(?i).*" + safeName + ".*' })";
+        Quickshell.execDetached({ command: ["hyprctl", "dispatch", focusCommand] });
+    }
+
+    function sendInlineReply(id, text) {
+        if (!text || !text.trim()) return;
+
+        Quickshell.execDetached({
+            command: [
+                "dbus-send", "--session", "--type=signal", "/",
+                "org.freedesktop.Notifications.NotificationReplied",
+                "uint32:" + id,
+                "string:" + text
+            ]
+        });
+    }
+
+    function destroyNotification(notif) {
+        if (!notif) return;
+        if (notif.timer) {
+            notif.timer.stop();
+            notif.timer.destroy();
+            notif.timer = null;
+        }
+        notif.destroy();
     }
 
     function discardNotification(id) {
         const index = root.list.findIndex(notif => notif.id === id);
         const notifServerIndex = notifServer.trackedNotifications.values.findIndex(notif => notif.id + root.idOffset === id);
         if (index !== -1) {
+            const removedNotif = root.list[index];
             root.list.splice(index, 1);
             triggerListChange();
-            // saveNotifications(); if i want to persist server notifications on restart, uncomment this line. but for now, we don't want to persist them.
+            destroyNotification(removedNotif);
+            saveNotifications();
         }
         if (notifServerIndex !== -1) {
             notifServer.trackedNotifications.values[notifServerIndex].dismiss();
@@ -373,9 +415,11 @@ Singleton {
         const removedCount = root.list.length - newList.length;
 
         if (removedCount > 0) {
+            const removedNotifications = root.list.filter(notif => idsMap[notif.id]);
             root.list = newList;
             triggerListChange();
-            // saveNotifications(); if i want to persist server notifications on restart, uncomment this line. but for now, we don't want to persist them.
+            removedNotifications.forEach(destroyNotification);
+            saveNotifications();
         }
 
         ids.forEach(id => {
@@ -388,9 +432,11 @@ Singleton {
     }
 
     function discardAllNotifications() {
+        const removedNotifications = root.list.slice();
         root.list = [];
         triggerListChange();
-        // saveNotifications(); if i want to persist server notifications on restart, uncomment this line. but for now, we don't want to persist them.
+        removedNotifications.forEach(destroyNotification);
+        saveNotifications();
         notifServer.trackedNotifications.values.forEach(notif => { notif.dismiss(); });
         root.discardAll();
     }

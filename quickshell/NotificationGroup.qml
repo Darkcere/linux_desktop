@@ -218,12 +218,7 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                let appName = groupItemDelegate.currentNotif.appName;
-                                if (appName) {
-                                    let safeName = appName.replace(/ /g, '.*');
-                                    let cmd = `hyprctl dispatch "hl.dsp.focus({ window = 'class:(?i).*${safeName}.*' })" || hyprctl dispatch "hl.dsp.focus({ window = 'title:(?i).*${safeName}.*' })"`;
-                                    Quickshell.execDetached({ command: ["bash", "-c", cmd] });
-                                }
+                                NotificationManager.focusNotificationApp(groupItemDelegate.currentNotif.appName);
 
                                 if (groupItemDelegate.defaultAction) {
                                     NotificationManager.attemptInvokeAction(groupItemDelegate.currentNotif.id, groupItemDelegate.defaultAction.identifier);
@@ -387,15 +382,8 @@ Item {
 
                                     onAccepted: {
                                         if (text.trim() !== "") {
-                                            // 1. Force the signal onto the bus manually (Bulletproof bypass)
-                                            let safeText = text.replace(/"/g, '\\"');
-                                            let dbusCmd = `dbus-send --session --type=signal / org.freedesktop.Notifications.NotificationReplied uint32:${groupItemDelegate.currentNotif.id} string:"${safeText}"`;
-                                            Quickshell.execDetached({ command: ["bash", "-c", dbusCmd] });
-
-                                            // 2. Clear the input box 
+                                            NotificationManager.sendInlineReply(groupItemDelegate.currentNotif.id, text);
                                             replyInput.text = "";
-
-                                            // 3. Instantly dismiss the notification
                                             NotificationManager.discardNotification(groupItemDelegate.currentNotif.id);
                                         }
                                     }

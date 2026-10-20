@@ -152,8 +152,8 @@ Item {
         launcherWindow.closeRequested();
         console.debug("Executing -> Name: " + entry.name + " | Dir: " + entry.workingDirectory + " | Uses: " + counts[entry.name]);
         
-        let cmdArgs = (entry.command || entry.name).split(" ").filter(Boolean);
-        
+        let cmdArgs = entry.commandArgs ? entry.commandArgs.slice() : (entry.command || entry.name).split(" ").filter(Boolean);
+         
         if (entry.terminal) {
             cmdArgs.unshift("foot");
         }
@@ -168,7 +168,7 @@ Item {
         id: fetchAppsProcess
         command: [
             "python3", "-c",
-            "import os, json, glob\n" +
+            "import os, json, glob, shlex\n" +
             "apps = []\n" +
             "seen_names = set()\n" +
             "\n" +
@@ -176,10 +176,16 @@ Item {
             "    for p in file_list:\n" +
             "        try:\n" +
             "            with open(p, 'r', encoding='utf-8') as f:\n" +
-            "                app = {'name':'', 'command':'', 'icon':'', 'workingDirectory':'', 'nodisplay':False, 'terminal':False}\n" +
+            "                app = {'name':'', 'command':'', 'commandArgs':[], 'icon':'', 'workingDirectory':'', 'nodisplay':False, 'terminal':False}\n" +
             "                for line in f:\n" +
             "                    if line.startswith('Name=') and not app['name']: app['name'] = line[5:].strip().replace('\"', '')\n" +
-            "                    elif line.startswith('Exec=') and not app['command']: app['command'] = line[5:].split(' %')[0].split(' @@')[0].strip().replace('\"', '')\n" +
+            "                    elif line.startswith('Exec=') and not app['command']:\n" +
+            "                        raw_exec = line[5:].strip()\n" +
+            "                        try: exec_args = shlex.split(raw_exec)\n" +
+            "                        except ValueError: exec_args = raw_exec.split()\n" +
+            "                        exec_args = [arg for arg in exec_args if not (len(arg) == 2 and arg[0] == '%' and arg[1] in 'fFuUdDnNickvm%')]\n" +
+            "                        app['commandArgs'] = exec_args\n" +
+            "                        app['command'] = ' '.join(exec_args)\n" +
             "                    elif line.startswith('Icon=') and not app['icon']: app['icon'] = line[5:].strip().replace('\"', '')\n" +
             "                    elif line.startswith('Path=') and not app['workingDirectory']: app['workingDirectory'] = line[5:].strip().replace('\"', '')\n" +
             "                    elif line.startswith('NoDisplay=') and line[10:].strip().lower() == 'true': app['nodisplay'] = True\n" +

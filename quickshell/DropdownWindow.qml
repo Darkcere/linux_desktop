@@ -27,6 +27,7 @@ PanelWindow {
             case "notifications": return 450;
             case "polkit": return 420;
             case "tools": return 520;
+            case "settings": return 600;
             default: return 600;
         }
     }
@@ -37,6 +38,7 @@ PanelWindow {
             case "dashboard": return 400;
             case "wallpaper": return 500;
             case "tools": return 570;
+            case "settings": return 620;
             case "powermenu": return 360;
             case "audio":
             case "notifications": return 550;
@@ -63,7 +65,7 @@ PanelWindow {
 
     // --- PROTECTED TOGGLES ---
     function toggleDashboard() { if (!isPolkitLocked) root.activeView = (root.activeView === "dashboard") ? "" : "dashboard" }
-    function toggleNotifications() { if (!isPolkitLocked) root.activeView = (root.activeView === "notifications") ? "" : "notifications" }
+    function toggleNotifications() { if (!isPolkitLocked && SettingsService.enableNotifications) root.activeView = (root.activeView === "notifications") ? "" : "notifications" }
     function toggleTrayMenu(trayItem) {
         if (isPolkitLocked) return;
         if (root.activeView === "tray" && root.currentTrayItem === trayItem) {
@@ -89,6 +91,7 @@ PanelWindow {
     function togglePowerMenu() { if (!isPolkitLocked) root.activeView = (root.activeView === "powermenu") ? "" : "powermenu" }
     function toggleClipboard() { if (!isPolkitLocked) root.activeView = (root.activeView === "clipboard") ? "" : "clipboard" }
     function toggleTools() { if (!isPolkitLocked) root.activeView = (root.activeView === "tools") ? "" : "tools" }
+    function toggleSettings() { if (!isPolkitLocked) root.activeView = (root.activeView === "settings") ? "" : "settings" }
     function toggleAudio() { if (!isPolkitLocked) root.activeView = (root.activeView === "audio") ? "" : "audio" }
 
     function openPolkit() { root.activeView = "polkit" }
@@ -287,7 +290,22 @@ PanelWindow {
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
                     sourceComponent: Component {
-                        Tools { isOpen: root.activeView === "tools"; onCloseRequested: root.closeRequested() }
+                        Tools {
+                            isOpen: root.activeView === "tools"
+                            onCloseRequested: root.closeRequested()
+                            onOpenSettingsRequested: root.toggleSettings()
+                        }
+                    }
+                }
+
+                Loader {
+                    active: root.activeView === "settings"
+                    anchors.fill: parent
+                    opacity: root.activeView === "settings" ? 1 : 0
+                    visible: opacity > 0
+                    Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
+                    sourceComponent: Component {
+                        FeatureSettings { isOpen: root.activeView === "settings"; onCloseRequested: root.closeRequested() }
                     }
                 }
 

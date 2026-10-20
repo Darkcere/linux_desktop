@@ -9,7 +9,7 @@ Rectangle {
     implicitWidth: mainRow.implicitWidth
     implicitHeight: 24
     color: "transparent"
-    enabled: root.Window.visibility !== Window.Hidden
+    enabled: SettingsService.enableMedia && root.Window.visibility !== Window.Hidden
     property bool isDashboardopen: false
     // 💡 THE FIX: Track the last used player asynchronously to avoid QML Binding Loop errors!
     property string lastPlayerName: ""
@@ -176,6 +176,7 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             anchors.verticalCenterOffset: -1
             z: -1
+            visible: SettingsService.enableVisualizer
         }
         
         Text {
@@ -209,7 +210,7 @@ Rectangle {
                 let artistInfo = root.artist ? "\n󰠃  " + root.artist : "";
                 return "󰝚  " + root.title + artistInfo + albumInfo;
             }
-            topMargin: 20
+            topMargin: 21
         }
     }
 }

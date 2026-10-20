@@ -1,5 +1,4 @@
 import Quickshell
-import Quickshell.Services.Polkit
 import QtQuick
 import QtQuick.Controls
 
@@ -7,29 +6,24 @@ Item {
     id: root
     
     property bool isOpen: false
+    property var polkitAgent: globalPolkitAgent // 👈 Reference persistent agent
+
     signal openRequested()
     signal closeRequested()
 
-    property string authMessage: (polkitAgent.flow && polkitAgent.flow.message) ? polkitAgent.flow.message : "Authentication Required"
-    property string promptText: (polkitAgent.flow && polkitAgent.flow.prompt) ? polkitAgent.flow.prompt : "Password:"
+    property string authMessage: (polkitAgent && polkitAgent.flow && polkitAgent.flow.message) ? polkitAgent.flow.message : "Authentication Required"
+    property string promptText: (polkitAgent && polkitAgent.flow && polkitAgent.flow.prompt) ? polkitAgent.flow.prompt : "Password:"
     property string errorMessage: ""
     property bool isAuthenticating: false
     property bool isCancelling: false
 
-    // --- POLKIT AGENT SERVICE ---
-    PolkitAgent {
-        id: polkitAgent
+    // --- AUTH STATE MONITORING ---
+    Connections {
+        target: polkitAgent
+        enabled: polkitAgent !== undefined && polkitAgent !== null
 
-        onIsRegisteredChanged: {
-            if (!isRegistered) {
-                console.warn("[PolkitDialog] Failed to register PolkitAgent! Another polkit agent is likely already running.")
-            } else {
-                console.info("[PolkitDialog] Successfully registered as system Polkit agent.")
-            }
-        }
-
-        onIsActiveChanged: {
-            if (isActive) {
+        function onIsActiveChanged() {
+            if (polkitAgent.isActive) {
                 if (!root.isCancelling) {
                     root.errorMessage = ""
                     root.isAuthenticating = false
@@ -46,10 +40,9 @@ Item {
     }
 
     // --- AUTH FLOW SIGNALS ---
-    // 💡 THE FIX: Listen to authentication lifecycle signals on the active flow object
     Connections {
-        target: polkitAgent.flow
-        enabled: polkitAgent.flow !== null
+        target: polkitAgent ? polkitAgent.flow : null
+        enabled: polkitAgent !== undefined && polkitAgent !== null && polkitAgent.flow !== null
 
         function onAuthenticationFailed() {
             root.errorMessage = "Authentication failed. Please try again."
@@ -80,7 +73,6 @@ Item {
         }
     }
 
-    // 💡 THE FIX: Uses cancelAuthenticationRequest() to properly terminate the D-Bus/PAM session
     function cancelAuth() {
         if (root.isCancelling) return
         root.isCancelling = true
@@ -88,20 +80,19 @@ Item {
         passwordField.text = ""
         root.errorMessage = ""
 
-        if (polkitAgent.flow) {
+        if (polkitAgent && polkitAgent.flow) {
             polkitAgent.flow.cancelAuthenticationRequest()
         } else {
             root.closeRequested()
         }
     }
 
-    // --- UI LAYOUT (Matched to Apps.qml color theme) ---
+    // --- UI LAYOUT ---
     Column {
         anchors.centerIn: parent
         width: parent.width - 48
         spacing: 14
 
-        // Title Header
         Text {
             text: "🔐  System Authentication"
             color: Colors.text
@@ -109,7 +100,6 @@ Item {
             font.bold: true
         }
 
-        // Polkit System Message
         Text {
             width: parent.width
             text: root.authMessage
@@ -119,7 +109,6 @@ Item {
             wrapMode: Text.WordWrap
         }
 
-        // PAM Prompt Label (e.g. "Password:")
         Text {
             text: root.promptText
             color: Colors.text
@@ -127,7 +116,6 @@ Item {
             font.pixelSize: 12
         }
 
-        // Password Input Field
         Rectangle {
             width: parent.width
             height: 45
@@ -148,7 +136,7 @@ Item {
                 font.pixelSize: 15
                 echoMode: TextInput.Password
                 clip: true
-                enabled: !root.isAuthenticating && !root.isCancelling && polkitAgent.isActive
+                enabled: !root.isAuthenticating && !root.isCancelling && (polkitAgent && polkitAgent.isActive)
 
                 onAccepted: {
                     if (text.length > 0 && !root.isAuthenticating && polkitAgent.flow) {
@@ -160,7 +148,6 @@ Item {
             }
         }
 
-        // Error Feedback Label
         Text {
             visible: root.errorMessage !== ""
             text: root.errorMessage
@@ -168,12 +155,10 @@ Item {
             font.pixelSize: 12
         }
 
-        // Action Buttons
         Row {
             anchors.right: parent.right
             spacing: 10
 
-            // Cancel Button
             Rectangle {
                 width: 90
                 height: 38
@@ -194,13 +179,10 @@ Item {
                     id: cancelArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    onClicked: {
-                        root.cancelAuth()
-                    }
+                    onClicked: root.cancelAuth()
                 }
             }
 
-            // Authenticate Button
             Rectangle {
                 width: 115
                 height: 38
@@ -221,9 +203,9 @@ Item {
                     id: authArea
                     anchors.fill: parent
                     hoverEnabled: true
-                    enabled: !root.isAuthenticating && !root.isCancelling && passwordField.text.length > 0 && polkitAgent.isActive
+                    enabled: !root.isAuthenticating && !root.isCancelling && passwordField.text.length > 0 && (polkitAgent && polkitAgent.isActive)
                     onClicked: {
-                        if (polkitAgent.flow) {
+                        if (polkitAgent && polkitAgent.flow) {
                             root.isAuthenticating = true
                             polkitAgent.flow.submit(passwordField.text)
                             passwordField.text = ""

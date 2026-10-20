@@ -2,6 +2,7 @@ singleton NightLightService NightLightService.qml
 singleton Colors Colors.qml
 singleton AudioService AudioService.qml
 singleton NotificationManager NotificationManager.qml
+singleton SettingsService SettingsService.qml
 
 NotificationPopup NotificationPopup.qml
 Dashboard Dashboard.qml
@@ -30,3 +31,4 @@ AudioMenu AudioMenu.qml
 PowerMenu PowerMenu.qml
 PolkitDialog PolkitDialog.qml
 NotificationGroup NotificationGroup.qml
+FeatureSettings FeatureSettings.qml

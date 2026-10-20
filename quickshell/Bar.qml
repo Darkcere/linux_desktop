@@ -4,6 +4,7 @@ import Quickshell.Wayland
 
 PanelWindow {
     id: mainBarWindow 
+    property var modelData
     WlrLayershell.layer: WlrLayer.Top
     property bool isGameMode: false
     property var menuHandler
@@ -215,7 +216,7 @@ PanelWindow {
                                     topMargin: 24
                                 }
                             }
-                            Mediaplayer { z: 10; anchors.verticalCenter: parent.verticalCenter; isDashboardopen: isDropdownOpen && menuHandler.lastActiveView === "dashboard"; visible: !mainBarWindow.isGameMode }
+                            Mediaplayer { z: 10; anchors.verticalCenter: parent.verticalCenter; isDashboardopen: isDropdownOpen && menuHandler.lastActiveView === "dashboard"; visible: SettingsService.enableMedia && !mainBarWindow.isGameMode }
                         }
                     }
                 }
@@ -245,7 +246,7 @@ PanelWindow {
                             // --- 2. NOTIFICATIONS ---
                             Text {
                                 id: notificationbell
-                                property bool isActive: !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "notifications")
+                                property bool isActive: SettingsService.enableNotifications && !(menuHandler && menuHandler.activeView && menuHandler.activeView !== "notifications")
                                 
                                 text: NotificationManager.silent 
                                 ? (hasNotifications ? "" : "") 
@@ -257,7 +258,7 @@ PanelWindow {
                                 width: isActive ? implicitWidth : 0
                                 opacity: isActive ? 1 : 0
                                 clip: true 
-                                visible: width > 0
+                                visible: SettingsService.enableNotifications && width > 0
                                 
                                 Behavior on width {NumberAnimation { duration: 150; easing.type: Easing.OutQuart } }
                                 Behavior on opacity {enabled: !mainBarWindow.isGameMode; NumberAnimation { duration: 150 } }
@@ -298,7 +299,7 @@ PanelWindow {
                                 clip: true 
                                 traytooltip: !isGameMode && !hasActivePopup 
                                 // 💡 THE FIX: Use the exposed integer property!
-                                visible: trayModule.itemCount > 0 
+                                visible: SettingsService.enableTray && trayModule.itemCount > 0 
                                 
                                 Behavior on width {NumberAnimation { duration: 250; easing.type: Easing.OutQuart } }
                                 Behavior on opacity {enabled: !mainBarWindow.isGameMode; NumberAnimation { duration: 150 } }
