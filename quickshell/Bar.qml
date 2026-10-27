@@ -53,8 +53,10 @@ PanelWindow {
         radius: mainBarWindow.isGameMode ? 0 : mainBarWindow.isDropdownOpen ? 12 : 5
         
         color: Colors.background
-        border.color: Colors.border
-        border.width: mainBarWindow.isGameMode ? 1 : 2
+        border{
+            color: Colors.border
+            width: mainBarWindow.isGameMode ? 1 : 2
+        }
         clip: true 
 
         Behavior on width { 

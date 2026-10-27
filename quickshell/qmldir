@@ -32,3 +32,4 @@ PowerMenu PowerMenu.qml
 PolkitDialog PolkitDialog.qml
 NotificationGroup NotificationGroup.qml
 FeatureSettings FeatureSettings.qml
+SettingsWindow SettingsWindow.qml

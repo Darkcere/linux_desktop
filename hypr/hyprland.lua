@@ -263,6 +263,10 @@ hl.bind(mainMod .. " + V", hl.dsp.global("quickshell:toggleClipboard"))
 hl.bind(mainMod .. " + T", hl.dsp.global("quickshell:toggleTools"))
 hl.bind(mainMod .. " + P", hl.dsp.global("quickshell:togglePowerMenu"))
 hl.bind(mainMod .. " + Space", hl.dsp.exec_cmd("hyprctl switchxkblayout sino-wealth-gaming-kb- next && notify-send -e \"Kb layout $(hyprctl devices -j | jq -r '.keyboards[] | select(.main == true) | .active_keymap')\""))
+hl.bind(
+    mainMod .. " + ALT + R",
+    hl.dsp.exec_cmd("quickshell kill >/dev/null 2>&1; sleep 0.1; qs -n -d")
+)
 
 hl.workspace_rule({
     workspace = "1",
@@ -400,7 +404,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("pgrep -x \"hypridle\" > /dev/null || hypridle")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
-    hl.exec_cmd("qs")
+    hl.exec_cmd("qs -n -d")
     hl.exec_cmd("steam -silent")
     hl.exec_cmd("playerctld")
 end)

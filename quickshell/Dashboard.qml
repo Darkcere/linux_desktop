@@ -679,6 +679,7 @@ Item {
                 }
                 // 💡 Night Light Toggle with Split Button & Arrow
                 Rectangle { 
+                    enabled: SettingsService.enableNightLight
                     Layout.fillWidth: true; Layout.fillHeight: true; radius: 12
                     color: quickSettings.nlOn ? Colors.workspaceactive : "transparent"
                     border.color: quickSettings.nlOn ? "transparent" : Colors.border; border.width: quickSettings.nlOn ? 0 : 2
@@ -804,8 +805,8 @@ Item {
             Loader {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                active: root.showNightLightMenu
-                visible: status === Loader.Ready
+                active: root.showNightLightMenu && SettingsService.enableNightLight
+                visible: SettingsService.enableNightLight && status === Loader.Ready
                 
                 sourceComponent: Component {
                     NightLightMenu {

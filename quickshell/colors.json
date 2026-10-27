@@ -1,10 +1,10 @@
 {
-    "background": "#171214",
+    "background": "#141317",
     "workspaceurgent": "#ff8678",
-    "workspaceactive": "#bd4c82",
-    "border": "#ffcfe0",
-    "workspace": "#9d3969",
-    "text": "#ffcfe0",
-    "secondary": "#e3bcca",
-    "outline": "#9e8c92"
+    "workspaceactive": "#6b60bc",
+    "border": "#c7bfff",
+    "workspace": "#5045a4",
+    "text": "#c7bfff",
+    "secondary": "#c8c3df",
+    "outline": "#928f9a"
 }

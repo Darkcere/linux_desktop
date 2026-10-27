@@ -20,11 +20,18 @@ QtObject {
         property bool enableDashboardStats: true
         property bool enableNetworkMonitor: true
         property bool enableBluetooth: true
-        property bool enableAudioProtection: true
         property bool enableInactiveBar: true
         property bool enableSystemStats: true
         property bool enableDashboardCalendar: true
         property bool enableQuickSettings: true
+        property bool enableNightLight: true
+        property bool enableLauncher: true
+        property bool enableClipboard: true
+        property bool enableTools: true
+        property bool enablePowerMenu: true
+        property bool enableWallpaperPicker: true
+        property bool enableAudioMenu: true
+        property bool enableLockScreen: true
         property bool legacyMigrated: false
     }
 
@@ -39,11 +46,18 @@ QtObject {
     property alias enableDashboardStats: settingsStore.enableDashboardStats
     property alias enableNetworkMonitor: settingsStore.enableNetworkMonitor
     property alias enableBluetooth: settingsStore.enableBluetooth
-    property alias enableAudioProtection: settingsStore.enableAudioProtection
     property alias enableInactiveBar: settingsStore.enableInactiveBar
     property alias enableSystemStats: settingsStore.enableSystemStats
     property alias enableDashboardCalendar: settingsStore.enableDashboardCalendar
     property alias enableQuickSettings: settingsStore.enableQuickSettings
+    property alias enableNightLight: settingsStore.enableNightLight
+    property alias enableLauncher: settingsStore.enableLauncher
+    property alias enableClipboard: settingsStore.enableClipboard
+    property alias enableTools: settingsStore.enableTools
+    property alias enablePowerMenu: settingsStore.enablePowerMenu
+    property alias enableWallpaperPicker: settingsStore.enableWallpaperPicker
+    property alias enableAudioMenu: settingsStore.enableAudioMenu
+    property alias enableLockScreen: settingsStore.enableLockScreen
 
     Component.onCompleted: {
         if (settingsStore.legacyMigrated) return;

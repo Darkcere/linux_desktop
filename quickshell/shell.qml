@@ -117,18 +117,34 @@ ShellRoot {
     }
     
     property bool isBarActive: SettingsService.enableBar
+    property bool settingsWindowOpen: false
+
+    function openSettings() {
+        settingsWindowOpen = true;
+        dropdownLoader.item?.closeRequested();
+    }
     
     GlobalShortcut { name: "toggleDashboard"; onPressed: dropdownLoader.item?.toggleDashboard() }
     GlobalShortcut { name: "toggleTools"; onPressed: dropdownLoader.item?.toggleTools() }
-    GlobalShortcut { name: "toggleSettings"; onPressed: dropdownLoader.item?.toggleSettings() }
+    GlobalShortcut { name: "toggleSettings"; onPressed: root.openSettings() }
     GlobalShortcut { name: "togglePowerMenu"; onPressed: dropdownLoader.item?.togglePowerMenu() }
     GlobalShortcut { name: "toggleClipboard"; onPressed: dropdownLoader.item?.toggleClipboard() }
     GlobalShortcut { name: "toggleLauncher"; onPressed: dropdownLoader.item?.toggleApps() }
     GlobalShortcut { name: "toggleWallpaperPicker"; onPressed: dropdownLoader.item?.openWallpaperPicker() }
     GlobalShortcut { name: "toggleAudioMenu"; onPressed: dropdownLoader.item?.toggleAudio() }
     GlobalShortcut { name: "toggleNotifications"; onPressed: dropdownLoader.item?.toggleNotifications() }
-    GlobalShortcut { name: "toggleBar"; onPressed: SettingsService.enableBar = !SettingsService.enableBar }
-    
+    GlobalShortcut {
+        name: "toggleBar"
+        onPressed: {
+            var newState = !SettingsService.enableBar;
+            SettingsService.enableBar = newState;
+            SettingsService.enableInactiveBar = newState;
+        }
+    }
+    Connections {
+        target: dropdownLoader.item
+        function onSettingsRequested() { root.openSettings(); }
+    }
     IpcHandler {
         target: "wallpaper"
         function update(): void {
@@ -139,12 +155,23 @@ ShellRoot {
     
     Loader {
         id: lockScreenLoader
-        active: root.isScreenLocked
+        active: root.isScreenLocked && SettingsService.enableLockScreen
         sourceComponent: Component {
             LockScreen {
                 isLocked: root.isScreenLocked
                 onUnlocked: root.isScreenLocked = false
             }
+        }
+    }
+
+    Loader {
+        id: settingsWindowLoader
+        active: root.settingsWindowOpen
+        sourceComponent: Component {
+            SettingsWindow {
+                targetScreen: root.activeScreen
+                onCloseRequested: root.settingsWindowOpen = false
+            } 
         }
     }
     
@@ -170,9 +197,7 @@ ShellRoot {
     PanelWindow {
         // 💡 Target the specific unfocused screen object, not the whole array
         screen: root.inactiveScreen
-        margins{
-            bottom: 3;
-        }
+
         // Only show if the bar is active and we actually HAVE an inactive screen 
         // (meaning you have at least 2 monitors connected).
         visible: SettingsService.enableInactiveBar && root.inactiveScreen && (root.inactiveScreen.name !== Hyprland.focusedMonitor?.name)

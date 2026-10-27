@@ -21,16 +21,31 @@ Item {
     Settings {
         id: wallpaperSettings
         category: "CaelestiaWallpapers"
-        property string cachedWallpapers: "[]"
         property string cachedActive: ""
+        property string wallpaperDirectories: "[\"~/Pictures/Wallpapers\"]"
     }
 
-    property var allWallpapersData: JSON.parse(wallpaperSettings.cachedWallpapers === "" ? "[]" : wallpaperSettings.cachedWallpapers)
-    property var currentWallpapers: allWallpapersData
+    property var allWallpapersData: []
+    property var currentWallpapers: []
+    property var wallpaperDirectories: parseWallpaperDirectories(wallpaperSettings.wallpaperDirectories)
     property int selectedIndex: 0
+    property bool foldersViewOpen: false
+    property bool folderBrowserOpen: false
+    property string folderBrowserPath: Quickshell.env("HOME")
+    property var folderEntries: []
     
     property string activeWallpaperPath: wallpaperSettings.cachedActive
     property var stagedRandomEntry: null 
+
+    function parseWallpaperDirectories(value) {
+        try {
+            let parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [parsed];
+        } catch (error) {
+            let legacyPath = value.trim();
+            return legacyPath === "" || legacyPath === "[]" ? ["~/Pictures/Wallpapers"] : [legacyPath];
+        }
+    }
 
     Timer {
         id: applyThemeTimer
@@ -86,8 +101,19 @@ Item {
         enabled: pickerWindow.isOpen
         onActivated: {
             console.log("QUICKSHELL: Manually refreshing wallpaper directory...")
-            fetchWallpapersProcess.running = true
+            pickerWindow.refreshWallpapers()
         }
+    }
+
+    Timer {
+        id: wallpaperRefreshTimer
+        interval: 50
+        onTriggered: fetchWallpapersProcess.running = true
+    }
+
+    function refreshWallpapers() {
+        fetchWallpapersProcess.running = false;
+        wallpaperRefreshTimer.restart();
     }
 
     function rollRandomWallpaper() {
@@ -131,22 +157,24 @@ Item {
         command: [
             "python3", "-c",
             "import os, json, random\n" +
+            "import sys\n" +
             "wps = []\n" +
             "current_wall = ''\n" +
-            "wp_dir = os.path.expanduser('~/Pictures/Wallpapers')\n" +
+            "wp_dirs = [os.path.expanduser(path) for path in json.loads(sys.argv[1])]\n" +
             "link_path = os.path.expanduser('~/.current.wall')\n" +
             "\n" +
-            "for root, dirs, files in os.walk(wp_dir):\n" +
-            "    if '.git' in dirs: dirs.remove('.git')\n" +
-            "    for f in files:\n" +
-            "        if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif')):\n" +
-            "            path = os.path.join(root, f)\n" +
-            "            rel = os.path.relpath(path, wp_dir)\n" +
-            "            subfolder = os.path.dirname(rel)\n" +
-            "            if not subfolder: subfolder = 'Main Folder'\n" +
-            "            name = os.path.basename(path).rsplit('.', 1)[0]\n" +
-            "            # Pre-calculate the Qt paths to save QML processing later\n" +
-            "            wps.append({'name': name, 'path': 'file://' + path, 'rawPath': path, 'subfolder': subfolder})\n" +
+            "for wp_dir in wp_dirs:\n" +
+            "    if not os.path.isdir(wp_dir): continue\n" +
+            "    for root, dirs, files in os.walk(wp_dir):\n" +
+            "        if '.git' in dirs: dirs.remove('.git')\n" +
+            "        for f in files:\n" +
+            "            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif')):\n" +
+            "                path = os.path.join(root, f)\n" +
+            "                rel = os.path.relpath(path, wp_dir)\n" +
+            "                relative_dir = os.path.dirname(rel)\n" +
+            "                subfolder = os.path.basename(wp_dir) if not relative_dir else os.path.basename(wp_dir) + '/' + relative_dir\n" +
+            "                name = os.path.basename(path).rsplit('.', 1)[0]\n" +
+            "                wps.append({'name': name, 'path': 'file://' + path, 'rawPath': path, 'subfolder': subfolder})\n" +
             "\n" +
             "if os.path.exists(link_path):\n" +
             "    current_wall = os.path.realpath(link_path)\n" +
@@ -155,7 +183,8 @@ Item {
             "    current_wall = random_wp['rawPath']\n" +
             "    os.symlink(current_wall, link_path)\n" +
             "\n" +
-            "print(json.dumps({'current': current_wall, 'wallpapers': wps}))"
+            "print(json.dumps({'current': current_wall, 'wallpapers': wps}))",
+            JSON.stringify(pickerWindow.wallpaperDirectories)
         ]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -178,20 +207,15 @@ Item {
                     
                     pickerWindow.allWallpapersData = freshArray;
                     
-                    // 💡 THE FIX: Save the parsed array to the native config file
-                    wallpaperSettings.cachedWallpapers = JSON.stringify(freshArray);
-                    
                     if (activeChanged) {
                         pickerWindow.activeWallpaperPath = data.current;
                         wallpaperSettings.cachedActive = data.current;
                     }
 
-                    if (fileCountChanged || currentWallpapers.length === 0) {
-                        if (currentWallpapers.length === 0) {
-                            pickerWindow.rollRandomWallpaper(); 
-                        }
-                        filterWallpapers(searchInput.text);
+                    if (currentWallpapers.length === 0) {
+                        pickerWindow.rollRandomWallpaper();
                     }
+                    pickerWindow.filterWallpapers(searchInput.text);
                 } catch(e) {
                     console.log("Failed to load wallpapers: " + e);
                 }
@@ -215,6 +239,61 @@ Item {
         pickerWindow.selectedIndex = 0;
     }
 
+    function openFolderBrowser() {
+        pickerWindow.folderBrowserPath = Quickshell.env("HOME");
+        pickerWindow.folderBrowserOpen = true;
+        folderEntriesProcess.running = true;
+    }
+
+    function navigateFolder(path) {
+        pickerWindow.folderBrowserPath = path;
+        folderEntriesProcess.running = true;
+    }
+
+    function chooseFolder() {
+        if (pickerWindow.wallpaperDirectories.indexOf(pickerWindow.folderBrowserPath) === -1) {
+            pickerWindow.wallpaperDirectories = pickerWindow.wallpaperDirectories.concat([pickerWindow.folderBrowserPath]);
+            wallpaperSettings.wallpaperDirectories = JSON.stringify(pickerWindow.wallpaperDirectories);
+            pickerWindow.allWallpapersData = [];
+            pickerWindow.currentWallpapers = [];
+            pickerWindow.refreshWallpapers();
+        }
+        pickerWindow.folderBrowserOpen = false;
+    }
+
+    function removeFolder(path) {
+        pickerWindow.wallpaperDirectories = pickerWindow.wallpaperDirectories.filter(folder => folder !== path);
+        wallpaperSettings.wallpaperDirectories = JSON.stringify(pickerWindow.wallpaperDirectories);
+        pickerWindow.allWallpapersData = [];
+        pickerWindow.currentWallpapers = [];
+        pickerWindow.refreshWallpapers();
+    }
+
+    Process {
+        id: folderEntriesProcess
+        command: [
+            "python3", "-c",
+            "import json, os, sys\n" +
+            "path = os.path.abspath(os.path.expanduser(sys.argv[1]))\n" +
+            "entries = []\n" +
+            "try:\n" +
+            "    entries = [{'name': name, 'path': os.path.join(path, name)} for name in sorted(os.listdir(path), key=str.lower) if os.path.isdir(os.path.join(path, name))]\n" +
+            "except OSError:\n" +
+            "    pass\n" +
+            "print(json.dumps(entries))",
+            folderBrowserPath
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    pickerWindow.folderEntries = JSON.parse(text);
+                } catch (error) {
+                    pickerWindow.folderEntries = [];
+                }
+            }
+        }
+    }
+
     Column {
         anchors.fill: parent
         anchors.margins: 20
@@ -230,8 +309,12 @@ Item {
             
             TextInput {
                 id: searchInput
-                anchors.fill: parent
-                anchors.margins: 12
+                anchors.left: parent.left
+                anchors.right: foldersToggle.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
                 verticalAlignment: TextInput.AlignVCenter
                 color: Colors.workspaceactive
                 font.pixelSize: 16
@@ -269,12 +352,244 @@ Item {
                     }
                 }
             }
+
+            Button {
+                id: foldersToggle
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.rightMargin: 6
+                width: 120
+                height: 35
+                z: 10
+                text: pickerWindow.foldersViewOpen ? "Wallpapers" : "Folders"
+                onClicked: pickerWindow.foldersViewOpen = !pickerWindow.foldersViewOpen
+
+                background: Rectangle {
+                    radius: 6
+                    color: foldersToggle.hovered || pickerWindow.foldersViewOpen ? Colors.workspaceactive : Qt.rgba(Colors.workspaceactive.r, Colors.workspaceactive.g, Colors.workspaceactive.b, 0.35)
+                    border.color: Colors.workspaceactive
+                    border.width: 2
+                }
+
+                contentItem: Text {
+                    text: pickerWindow.foldersViewOpen ? "Wallpapers" : "Folders"
+                    color: foldersToggle.hovered || pickerWindow.foldersViewOpen ? Colors.background : Colors.workspaceactive
+                    font.pixelSize: 13
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+        }
+
+        Rectangle {
+            width: parent.width
+            height: parent.height - 130
+            visible: pickerWindow.foldersViewOpen
+            color: "transparent"
+            border.color: Colors.border
+            border.width: 2
+            radius: 8
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 15
+                spacing: 10
+
+                Row {
+                    width: parent.width
+                    height: 38
+                    spacing: 10
+
+                    Text {
+                        width: parent.width - addFolderButton.width - 10
+                        text: pickerWindow.folderBrowserOpen ? pickerWindow.folderBrowserPath : "Wallpaper folders"
+                        color: Colors.workspaceactive
+                        font.pixelSize: 17
+                        font.bold: true
+                        elide: Text.ElideMiddle
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    Rectangle {
+                        id: addFolderButton
+                        width: 125
+                        height: parent.height
+                        radius: 6
+                        color: addFolderMouseArea.containsMouse ? Colors.workspaceactive : Qt.rgba(Colors.workspaceactive.r, Colors.workspaceactive.g, Colors.workspaceactive.b, 0.2)
+                        border.color: Colors.workspaceactive
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: pickerWindow.folderBrowserOpen ? "Choose" : "Add folder"
+                            color: addFolderMouseArea.containsMouse ? Colors.background : Colors.workspaceactive
+                            font.pixelSize: 13
+                            font.bold: true
+                        }
+
+                        MouseArea {
+                            id: addFolderMouseArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: {
+                                if (pickerWindow.folderBrowserOpen) {
+                                    pickerWindow.chooseFolder();
+                                } else {
+                                    pickerWindow.openFolderBrowser();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: parent.height - 48
+                    color: "transparent"
+                    visible: !pickerWindow.folderBrowserOpen
+
+                    ListView {
+                        anchors.fill: parent
+                        clip: true
+                        model: pickerWindow.wallpaperDirectories
+                        spacing: 6
+
+                        delegate: Rectangle {
+                            width: ListView.view.width
+                            height: 44
+                            radius: 6
+                            color: folderRowMouseArea.containsMouse ? Qt.rgba(Colors.workspaceactive.r, Colors.workspaceactive.g, Colors.workspaceactive.b, 0.2) : Qt.rgba(Colors.workspaceempty.r, Colors.workspaceempty.g, Colors.workspaceempty.b, 0.1)
+                            border.color: Colors.border
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 12
+                                anchors.right: removeFolderButton.left
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData
+                                color: Colors.workspaceactive
+                                elide: Text.ElideMiddle
+                            }
+
+                            Rectangle {
+                                id: removeFolderButton
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.rightMargin: 8
+                                width: 78
+                                height: 30
+                                radius: 5
+                                color: removeFolderMouseArea.containsMouse ? Colors.workspaceactive : "transparent"
+                                border.color: Colors.border
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Remove"
+                                    color: removeFolderMouseArea.containsMouse ? Colors.background : Colors.workspaceactive
+                                    font.pixelSize: 12
+                                }
+
+                                MouseArea {
+                                    id: removeFolderMouseArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: pickerWindow.removeFolder(modelData)
+                                }
+                            }
+
+                            MouseArea {
+                                id: folderRowMouseArea
+                                anchors.fill: parent
+                                anchors.rightMargin: 90
+                                hoverEnabled: true
+                                acceptedButtons: Qt.NoButton
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    width: parent.width
+                    height: parent.height - 48
+                    spacing: 8
+                    visible: pickerWindow.folderBrowserOpen
+
+                    Row {
+                        width: parent.width
+                        height: 32
+                        spacing: 8
+
+                        Rectangle {
+                            width: 34
+                            height: parent.height
+                            radius: 5
+                            color: upFolderMouseArea.containsMouse ? Colors.workspaceactive : "transparent"
+                            border.color: Colors.border
+
+                            Text { anchors.centerIn: parent; text: ".."; color: Colors.workspaceactive; font.bold: true }
+
+                            MouseArea {
+                                id: upFolderMouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: {
+                                    let path = pickerWindow.folderBrowserPath;
+                                    while (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+                                    let parentPath = path.substring(0, path.lastIndexOf("/"));
+                                    pickerWindow.navigateFolder(parentPath || "/");
+                                }
+                            }
+                        }
+
+                        Text {
+                            width: parent.width - 42
+                            height: parent.height
+                            text: "Choose a folder"
+                            color: Colors.workspace
+                            opacity: 0.7
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                    }
+
+                    ListView {
+                        width: parent.width
+                        height: parent.height - 40
+                        clip: true
+                        model: pickerWindow.folderEntries
+                        spacing: 3
+
+                        delegate: Rectangle {
+                            width: ListView.view.width
+                            height: 32
+                            radius: 5
+                            color: browserFolderMouseArea.containsMouse ? Qt.rgba(Colors.workspaceactive.r, Colors.workspaceactive.g, Colors.workspaceactive.b, 0.2) : "transparent"
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData.name + "/"
+                                color: Colors.workspaceactive
+                            }
+
+                            MouseArea {
+                                id: browserFolderMouseArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: pickerWindow.navigateFolder(modelData.path)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Row {
             width: parent.width
             height: parent.height - 130 
             spacing: 15
+            visible: !pickerWindow.foldersViewOpen
 
             GridView {
                 id: wallpaperGrid
@@ -355,7 +670,7 @@ Item {
                             opacity: (wpMouseArea.containsMouse || wallpaperGrid.currentIndex === index || modelData.rawPath === pickerWindow.activeWallpaperPath) ? 1.0 : 0.6
                             Behavior on opacity { NumberAnimation { duration: 150 } }
                         }
-                        
+
                         Rectangle {
                             anchors.fill: parent
                             color: Colors.background

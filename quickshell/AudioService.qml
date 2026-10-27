@@ -18,7 +18,7 @@ Singleton {
     // QML handles those updates natively in C++, making these JS signals redundant.
 
     // --- PROTECTION SETTINGS ---
-    property bool protectionEnabled: SettingsService.enableAudioProtection
+    property bool protectionEnabled: false
     readonly property real maxVolumeJump: 0.15 
     property bool protectionTriggered: false
 

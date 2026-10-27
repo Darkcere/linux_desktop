@@ -76,10 +76,10 @@ PanelWindow {
         }
     }
     
-    function toggleApps() { if (!isPolkitLocked) root.activeView = (root.activeView === "apps") ? "" : "apps" }
-    function toggleWallpaperPicker() { if (!isPolkitLocked) root.activeView = (root.activeView === "wallpaper") ? "" : "wallpaper" }
+    function toggleApps() { if (!isPolkitLocked && SettingsService.enableLauncher) root.activeView = (root.activeView === "apps") ? "" : "apps" }
+    function toggleWallpaperPicker() { if (!isPolkitLocked && SettingsService.enableWallpaperPicker) root.activeView = (root.activeView === "wallpaper") ? "" : "wallpaper" }
     function openWallpaperPicker() {
-        if (isPolkitLocked) return;
+        if (isPolkitLocked || !SettingsService.enableWallpaperPicker) return;
         if (root.activeView === "wallpaper") {
             if (wallpaperPickerLoader.item) {
                 wallpaperPickerLoader.item.rollRandomWallpaper()
@@ -88,11 +88,12 @@ PanelWindow {
             root.activeView = "wallpaper"
         }
     }
-    function togglePowerMenu() { if (!isPolkitLocked) root.activeView = (root.activeView === "powermenu") ? "" : "powermenu" }
-    function toggleClipboard() { if (!isPolkitLocked) root.activeView = (root.activeView === "clipboard") ? "" : "clipboard" }
-    function toggleTools() { if (!isPolkitLocked) root.activeView = (root.activeView === "tools") ? "" : "tools" }
-    function toggleSettings() { if (!isPolkitLocked) root.activeView = (root.activeView === "settings") ? "" : "settings" }
-    function toggleAudio() { if (!isPolkitLocked) root.activeView = (root.activeView === "audio") ? "" : "audio" }
+    function togglePowerMenu() { if (!isPolkitLocked && SettingsService.enablePowerMenu) root.activeView = (root.activeView === "powermenu") ? "" : "powermenu" }
+    function toggleClipboard() { if (!isPolkitLocked && SettingsService.enableClipboard) root.activeView = (root.activeView === "clipboard") ? "" : "clipboard" }
+    function toggleTools() { if (!isPolkitLocked && SettingsService.enableTools) root.activeView = (root.activeView === "tools") ? "" : "tools" }
+    signal settingsRequested()
+    function toggleSettings() { if (!isPolkitLocked) root.settingsRequested() }
+    function toggleAudio() { if (!isPolkitLocked && SettingsService.enableAudioMenu) root.activeView = (root.activeView === "audio") ? "" : "audio" }
 
     function openPolkit() { root.activeView = "polkit" }
     function closePolkit() { if (root.activeView === "polkit") root.closeRequested() }
@@ -209,7 +210,7 @@ PanelWindow {
 
                 // ⚡ LAZY-LOAD & KEEP-ALIVE SYSTEM: Eliminates lag when reopening views
                 Loader {
-                    active: root.activeView === "apps"
+                    active: root.activeView === "apps" && SettingsService.enableLauncher
 
                     
                     anchors.fill: parent
@@ -245,7 +246,7 @@ PanelWindow {
                 
                 Loader {
                     id: wallpaperPickerLoader
-                    active: root.activeView === "wallpaper"
+                    active: root.activeView === "wallpaper" && SettingsService.enableWallpaperPicker
 
                     
                     anchors.fill: parent
@@ -258,7 +259,7 @@ PanelWindow {
                 }
                 
                 Loader {
-                    active: root.activeView === "powermenu"
+                    active: root.activeView === "powermenu" && SettingsService.enablePowerMenu
 
                     anchors.fill: parent
                     opacity: root.activeView === "powermenu" ? 1 : 0
@@ -271,7 +272,7 @@ PanelWindow {
                 
                 Loader {
 
-                    active: root.activeView === "clipboard"
+                    active: root.activeView === "clipboard" && SettingsService.enableClipboard
                     
                     anchors.fill: parent
                     opacity: root.activeView === "clipboard" ? 1 : 0
@@ -283,7 +284,7 @@ PanelWindow {
                 }
                 
                 Loader {
-                    active: root.activeView === "tools"
+                    active: root.activeView === "tools" && SettingsService.enableTools
                     
                     anchors.fill: parent
                     opacity: root.activeView === "tools" ? 1 : 0
@@ -299,18 +300,7 @@ PanelWindow {
                 }
 
                 Loader {
-                    active: root.activeView === "settings"
-                    anchors.fill: parent
-                    opacity: root.activeView === "settings" ? 1 : 0
-                    visible: opacity > 0
-                    Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
-                    sourceComponent: Component {
-                        FeatureSettings { isOpen: root.activeView === "settings"; onCloseRequested: root.closeRequested() }
-                    }
-                }
-
-                Loader {
-                    active: root.activeView === "audio"
+                    active: root.activeView === "audio" && SettingsService.enableAudioMenu
                     
                     anchors.fill: parent
                     opacity: root.activeView === "audio" ? 1 : 0
@@ -336,7 +326,7 @@ PanelWindow {
 
                 Loader {
                     anchors.fill: parent
-                    active: true // Always active to catch auth prompts immediately
+                    active: root.activeView === "polkit"
                     opacity: root.activeView === "polkit" ? 1 : 0
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
