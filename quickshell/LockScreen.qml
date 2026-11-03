@@ -115,6 +115,7 @@ Scope {
                             anchors.fill: parent
                             source: "file:///home/" + (Quickshell.env("USER") || "duarte") + "/.current.wall"
                             fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
                             z: -1 
                         }
 

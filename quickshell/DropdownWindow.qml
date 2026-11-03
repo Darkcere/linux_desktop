@@ -50,7 +50,7 @@ PanelWindow {
     property int currentDropWidth: getDropWidth(lastActiveView)
     property int currentDropHeight: getDropHeight(lastActiveView)
     property bool isRightAligned: lastActiveView === "tray" || lastActiveView === "audio" || lastActiveView === "notifications"
-    property int morphSpeed: isGameMode ? 0 : 350
+    property int morphSpeed: isGameMode ? 0 : 450
     onActiveViewChanged: {
         if (activeView !== "") {
             lastActiveView = activeView

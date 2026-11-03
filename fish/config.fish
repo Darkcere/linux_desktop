@@ -1,4 +1,3 @@
-alias windows="sudo umount /mnt/window && sudo ntfs-3g -o remove_hiberfile /dev/nvme0n1p3 /mnt/window/"
 alias rpi="ssh server@192.168.1.246"
 alias debian="ssh server@192.168.1.247"
 alias camera-phone="$HOME/.config/hypr/scripts/camera-phone.sh"
@@ -10,4 +9,7 @@ if status is-interactive
     echo -en "\e]133;A\e\\"
     fastfetch
     #end
+end
+if status is-login; and test -z "$DISPLAY"; and test (tty) = "/dev/tty1"
+    exec start-hyprland
 end

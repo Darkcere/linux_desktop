@@ -395,16 +395,16 @@ hl.config({
         direct_scanout = 2,
     },
     debug = {
-        vfr = false,
+        vfr = true,
     },
 })
 
 hl.on("hyprland.start", function()
     hl.exec_cmd("touch /tmp/qs_locked && touch /tmp/qs_is_locked")
+    hl.exec_cmd("qs -n -d")
     hl.exec_cmd("pgrep -x \"hypridle\" > /dev/null || hypridle")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
-    hl.exec_cmd("qs -n -d")
     hl.exec_cmd("steam -silent")
     hl.exec_cmd("playerctld")
 end)

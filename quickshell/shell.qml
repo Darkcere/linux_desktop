@@ -45,6 +45,8 @@ ShellRoot {
     
     property bool isScreenLocked: false
 
+    Component.onCompleted: lockCheckProc.running = true
+
     Timer {
         interval: 250
         running: !root.isScreenLocked
@@ -177,20 +179,20 @@ ShellRoot {
     
     
     // Main Bar (Only on the actively focused screen)
-    Variants {
-        model: (root.isBarActive && !root.realFullscreen && root.activeScreen) ? [root.activeScreen] : []
-        
-        delegate: Component {
+    Loader { 
+        id: barLoader
+        active: root.isBarActive && !root.realFullscreen && root.activeScreen
+        sourceComponent: Component {
             Bar {
-                screen: modelData
-                menuHandler: dropdownLoader.item 
+                screen: root.activeScreen
+                menuHandler: dropdownLoader.item
                 isDropdownOpen: dropdownLoader.item?.isOpen ?? false
                 dropdownWidth: dropdownLoader.item?.currentDropWidth ?? 0
                 onToggleLauncherRequested: dropdownLoader.item?.toggleApps()
                 onToggleDashboardRequested: dropdownLoader.item?.toggleDashboard()
                 onTogglePowerRequested: dropdownLoader.item?.togglePowerMenu()
                 isGameMode: root.isGameMode
-            }
+            } 
         }
     }
     // Dynamic Island Notch with custom MediaPlayer component
@@ -215,7 +217,7 @@ ShellRoot {
             property bool hasMedia: mediaLoader.status === Loader.Ready && mediaLoader.item && mediaLoader.item.visible
             
             width: hasMedia ? userClock.width + mediaLoader.width + 32 : userClock.width + 32
-            height: Math.max(32, userClock.height + 12, userClock.implicitHeight + 12)
+            height: Math.max(30, userClock.height + 12, userClock.implicitHeight + 12)
             clip: true 
             
             Behavior on width { NumberAnimation { duration: 50; easing.type: Easing.OutExpo } }

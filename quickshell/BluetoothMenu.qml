@@ -264,7 +264,7 @@ Rectangle {
                 }
                 
                 Text {
-                    text: "Bluetooth is turned off"
+                    text: Bluetooth.defaultAdapter ? "Bluetooth is turned off" : "No Bluetooth adapter found"
                     color: Colors.text
                     opacity: 0.6
                     font.pixelSize: 13

@@ -65,18 +65,26 @@ QtObject {
         try {
             const path = Quickshell.env("HOME") + "/.config/quickshell/shell_settings.json";
             const xhr = new XMLHttpRequest();
-            xhr.open("GET", "file://" + path, false);
-            xhr.send();
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== 4) return;
 
-            if (xhr.status === 200 || xhr.status === 0) {
-                const legacy = JSON.parse(xhr.responseText);
-                if (legacy.enableBar !== undefined) settingsStore.enableBar = legacy.enableBar;
-                if (legacy.enableOsd !== undefined) settingsStore.enableOsd = legacy.enableOsd;
-            }
+                try {
+                    if (xhr.status === 200 || xhr.status === 0) {
+                        const legacy = JSON.parse(xhr.responseText);
+                        if (legacy.enableBar !== undefined) settingsStore.enableBar = legacy.enableBar;
+                        if (legacy.enableOsd !== undefined) settingsStore.enableOsd = legacy.enableOsd;
+                    }
+                } catch (error) {
+                    console.log("No legacy feature settings found.");
+                }
+
+                settingsStore.legacyMigrated = true;
+            };
+            xhr.open("GET", "file://" + path, true);
+            xhr.send();
         } catch (error) {
             console.log("No legacy feature settings found.");
+            settingsStore.legacyMigrated = true;
         }
-
-        settingsStore.legacyMigrated = true;
     }
 }

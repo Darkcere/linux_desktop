@@ -488,7 +488,8 @@ Item {
                 Layout.maximumHeight: 46
                 spacing: 10
                 
-                property bool btOn: Bluetooth.defaultAdapter.enabled
+                property bool hasBtAdapter: Bluetooth.defaultAdapter !== null
+                property bool btOn: hasBtAdapter && Bluetooth.defaultAdapter.enabled
                 property bool caffeineOn: false
                 property bool gameOn: false
                 property bool netOn: Networking.connectivity === NetworkConnectivity.Full
@@ -609,19 +610,35 @@ Item {
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             
-                            Text { 
+                            Item {
                                 anchors.centerIn: parent
-                                text: quickSettings.btOn ? "󰂯" : "󰂲"
-                                color: quickSettings.btOn ? Colors.background : Colors.text
-                                opacity: quickSettings.btOn ? 1.0 : 0.7
-                                font.pixelSize: 20 
+                                anchors.horizontalCenterOffset: 2
+                                width: 24
+                                height: 24
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: quickSettings.btOn ? "󰂯" : "󰂲"
+                                    color: quickSettings.btOn ? Colors.background : Colors.text
+                                    opacity: quickSettings.btOn ? 1.0 : 0.7
+                                    font.pixelSize: 20
+                                }
+
+                                Text {
+                                    visible: !quickSettings.hasBtAdapter
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    text: "󰅖"
+                                    color: Colors.text
+                                    font.pixelSize: 11
+                                }
                             }
                             
                             MouseArea {
                                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                enabled: quickSettings.hasBtAdapter
                                 onClicked: {
-                                    quickSettings.btOn = !quickSettings.btOn;
-                                    Quickshell.execDetached({ command: ["rfkill", quickSettings.btOn ? "unblock" : "block", "bluetooth"] });
+                                    Quickshell.execDetached({ command: ["rfkill", quickSettings.btOn ? "block" : "unblock", "bluetooth"] });
                                 }
                             }
                         }

@@ -129,6 +129,8 @@ Singleton {
 
     property bool silent: false
     property list<Notif> list: []
+    property int maxLiveNotifications: 200
+    property int maxPopupNotifications: 5
     property var popupList: list.filter(notif => notif.popup)
     property bool popupInhibited: silent || !SettingsService.enableNotificationPopups
     property var totalCounts: ({}) 
@@ -188,6 +190,50 @@ Singleton {
         });
     } 
 
+    function trimLiveNotifications() {
+        while (root.list.length > root.maxLiveNotifications) {
+            var oldestIndex = 0;
+            for (var i = 1; i < root.list.length; i++) {
+                if (root.list[i].time < root.list[oldestIndex].time) {
+                    oldestIndex = i;
+                }
+            }
+
+            const oldest = root.list[oldestIndex];
+            root.list.splice(oldestIndex, 1);
+            destroyNotification(oldest);
+        }
+        triggerListChange();
+    }
+
+    function appendNotification(notif) {
+        if (!notif) return;
+        root.list = [...root.list, notif];
+        trimLiveNotifications();
+    }
+
+    function showPopup(notif, interval) {
+        if (!notif || root.popupInhibited) return;
+
+        notif.popup = true;
+        notif.timer = notifTimerComponent.createObject(root, {
+            "id": notif.id,
+            "interval": interval
+        });
+
+        const activePopups = root.list.filter(item => item && item.popup);
+        activePopups.sort((a, b) => b.time - a.time);
+        for (let i = root.maxPopupNotifications; i < activePopups.length; i++) {
+            activePopups[i].popup = false;
+            if (activePopups[i].timer) {
+                activePopups[i].timer.stop();
+                activePopups[i].timer.destroy();
+                activePopups[i].timer = null;
+            }
+        }
+        triggerListChange();
+    }
+
     function limitNotificationsPerSummary(notifications) {
         var groups = {};
         notifications.forEach(notif => {
@@ -209,6 +255,7 @@ Singleton {
         try {
             const data = JSON.parse(notifSettings.cachedJSON === "" ? "[]" : notifSettings.cachedJSON);
             root.list = data.map(jsonToNotif);
+            trimLiveNotifications();
             
             let maxId = 0;
             root.list.forEach(notif => {
@@ -302,17 +349,10 @@ Singleton {
             });
 
             Qt.callLater(() => {
-                root.list = [...root.list, newNotifObject];
+                appendNotification(newNotifObject);
+                showPopup(newNotifObject, notification.expireTimeout < 0 ? 5000 : notification.expireTimeout);
                 saveNotifications();
             });
-
-            if (!root.popupInhibited) {
-                newNotifObject.popup = true;
-                newNotifObject.timer = notifTimerComponent.createObject(root, {
-                    "id": newNotifObject.id,
-                    "interval": notification.expireTimeout < 0 ? 5000 : notification.expireTimeout
-                });
-            }
 
             root.notify(newNotifObject);
         }
@@ -345,14 +385,10 @@ Singleton {
             "isCached": false
         });
 
-        if (newNotifObject.popup) {
-            newNotifObject.timer = notifTimerComponent.createObject(root, {
-                "id": newNotifObject.id,
-                "interval": options.expireTimeout || 5000
-            });
+        appendNotification(newNotifObject);
+        if (!root.popupInhibited && options.popup !== false) {
+            showPopup(newNotifObject, options.expireTimeout || 5000);
         }
-
-        root.list = [...root.list, newNotifObject];
         saveNotifications();
         root.notify(newNotifObject);
         return newNotifObject;
