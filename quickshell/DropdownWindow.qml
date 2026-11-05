@@ -348,7 +348,11 @@ PanelWindow {
                     visible: opacity > 0
                     Behavior on opacity { NumberAnimation { duration: root.morphSpeed / 2 } }
                     sourceComponent: Component {
-                        Dashboard { isOpen: root.activeView === "dashboard"; onCloseRequested: root.closeRequested() }
+                        Dashboard {
+                            isOpen: root.activeView === "dashboard"
+                            targetScreen: root.screen
+                            onCloseRequested: root.closeRequested()
+                        }
                     }
                 }
             }

@@ -31,25 +31,12 @@ Item {
     function executeSelected(index) {
         if (index >= 0 && index < powerModel.length) {
             let action = powerModel[index].action;
-            
-            // 🚀 INIT SYSTEM DETECTION & UNIVERSAL COMMANDS: 
-            let bashCmd = "INIT=$(ps -p 1 -o comm= | tr -d '\\n')\n" +
-                          "if [ \"$INIT\" = \"systemd\" ]; then\n" +
-                          "  CMD_PWR=\"systemctl poweroff\"\n" +
-                          "  CMD_RBT=\"systemctl reboot\"\n" +
-                          "  CMD_SUS=\"systemctl suspend\"\n" +
-                          "else\n" +
-                          "  # Dinit / OpenRC / Runit fallback using elogind or standard binaries\n" +
-                          "  CMD_PWR=\"loginctl poweroff || poweroff\"\n" +
-                          "  CMD_RBT=\"loginctl reboot || reboot\"\n" +
-                          "  CMD_SUS=\"loginctl suspend\"\n" +
-                          "fi\n" +
-                          "\n" +
-                          "case \"" + action + "\" in\n" +
-                          "  \"suspend\") eval $CMD_SUS ;;\n" +
-                          "  \"poweroff\") hyprshutdown -t 'Shutting down...' --post-cmd \"$CMD_PWR\" ;;\n" +
-                          "  \"reboot\") hyprshutdown -t 'Restarting...' --post-cmd \"$CMD_RBT\" ;;\n" +
-                          "  \"lock\") loginctl lock-session ;;\n" +
+
+            let bashCmd = "case \"" + action + "\" in\n" +
+                          "  \"suspend\") loginctl suspend ;;\n" +
+                          "  \"poweroff\") hyprshutdown -t 'Shutting down...' --post-cmd 'loginctl poweroff' ;;\n" +
+                          "  \"reboot\") hyprshutdown -t 'Restarting...' --post-cmd 'loginctl reboot' ;;\n" +
+                          "  \"lock\") touch /tmp/qs_locked ;;\n" +
                           "  \"logout\") hyprshutdown -t 'Logging out...' ;;\n" +
                           "esac";
 

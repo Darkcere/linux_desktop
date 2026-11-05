@@ -12,10 +12,26 @@ import QtCore
 Item {
     id: root
     property bool isOpen: false
+    property var targetScreen: null
+    property string brightnessBus: ""
     property bool showBluetoothMenu: false
     property bool showNetworkMenu: false
     property bool showNightLightMenu: false
     signal closeRequested()
+
+    function refreshBrightness() {
+        if (!root.isOpen || !root.targetScreen) return;
+        detectBrightnessDisplays.running = true;
+    }
+
+    function setMonitorBrightness(value) {
+        if (root.brightnessBus === "") return;
+        setBrightness.command = ["ddcutil", "-b", root.brightnessBus, "--noverify", "setvcp", "10", Math.round(value).toString()];
+        setBrightness.running = true;
+    }
+
+    onIsOpenChanged: if (isOpen) refreshBrightness()
+    onTargetScreenChanged: refreshBrightness()
 
     Shortcut {
         sequence: "Escape"
@@ -638,7 +654,8 @@ Item {
                                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                 enabled: quickSettings.hasBtAdapter
                                 onClicked: {
-                                    Quickshell.execDetached({ command: ["rfkill", quickSettings.btOn ? "block" : "unblock", "bluetooth"] });
+                                    if (!Bluetooth.defaultAdapter) return;
+                                    Bluetooth.defaultAdapter.enabled = !Bluetooth.defaultAdapter.enabled;
                                 }
                             }
                         }
@@ -1122,9 +1139,7 @@ with open('/proc/net/dev', 'r') as f:
                             from: 0; to: 100; stepSize: 1
                             
                             onMoved: {
-                                let val = Math.round(value);
-                                setBrightness.command = ["ddcutil", "-b", "7", "--noverify", "setvcp", "10", val.toString()];
-                                setBrightness.running = true;
+                                root.setMonitorBrightness(value);
                             }
 
                             MouseArea {
@@ -1133,8 +1148,7 @@ with open('/proc/net/dev', 'r') as f:
                                 onWheel: (wheel) => {
                                     let delta = wheel.angleDelta.y > 0 ? 5 : -5;
                                     bSlider.value = Math.min(100, Math.max(0, bSlider.value + delta));
-                                    setBrightness.command = ["ddcutil", "-b", "7", "--noverify", "setvcp", "10", Math.round(bSlider.value).toString()];
-                                    setBrightness.running = true;
+                                    root.setMonitorBrightness(bSlider.value);
                                     wheel.accepted = true;
                                 }
                             }
@@ -1366,26 +1380,38 @@ with open('/proc/net/dev', 'r') as f:
     }
 
     Process {
-        id: getBrightness
-        command: ["python3", "-c", "
-import subprocess
-try:
-    res = subprocess.run(['ddcutil', '-b', '7', 'getvcp', '10', '--brief'], capture_output=True, text=True, timeout=3)
-    parts = res.stdout.strip().split()
-    if len(parts) >= 4:
-        print(int(parts[3]))
-    else:
-        print(0)
-except Exception:
-    print(0)
-"]
-        running: root.isOpen 
+        id: detectBrightnessDisplays
+        command: ["ddcutil", "detect", "--verbose"]
         stdout: StdioCollector {
             onStreamFinished: {
-                let val = parseInt(text.trim());
-                if (!isNaN(val)) {
-                    bSlider.value = val;
+                let screenName = root.targetScreen?.name ?? "";
+                let displays = text.split(/\n(?=Display \d+)/);
+                root.brightnessBus = "";
+
+                for (let display of displays) {
+                    let connectorMatch = display.match(/DRM_connector:\s+card\d+-(\S+)/);
+                    let busMatch = display.match(/I2C bus:\s+\/dev\/i2c-(\d+)/);
+                    if (connectorMatch && busMatch && connectorMatch[1] === screenName) {
+                        root.brightnessBus = busMatch[1];
+                        break;
+                    }
                 }
+
+                if (root.brightnessBus !== "") {
+                    getBrightness.command = ["ddcutil", "-b", root.brightnessBus, "getvcp", "10", "--brief"];
+                    getBrightness.running = true;
+                }
+            }
+        }
+    }
+
+    Process {
+        id: getBrightness
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let parts = text.trim().split(/\s+/);
+                let val = parseInt(parts[3]);
+                if (!isNaN(val)) bSlider.value = val;
             }
         }
     }
